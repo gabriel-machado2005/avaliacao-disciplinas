@@ -11,6 +11,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { UserRole } from '../users/entities/user.entity';
 import { CreateEvaluationPeriodDto } from './dto/create-evaluation-period.dto';
 import { EvaluationsService } from './evaluations.service';
+import { CreateEvaluationDto } from './dto/create-evaluation.dto';
 
 @Controller('evaluations')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -30,5 +31,16 @@ export class EvaluationsController {
   @Get('periods')
   findPeriods() {
     return this.evaluationsService.findPeriods();
+  }
+  @Post()
+  createEvaluation(
+  @Body() dto: CreateEvaluationDto,
+  ) {
+  return this.evaluationsService.createEvaluation(dto);
+  }
+
+  @Get()
+  findEvaluations() {
+  return this.evaluationsService.findEvaluations();
   }
 }
