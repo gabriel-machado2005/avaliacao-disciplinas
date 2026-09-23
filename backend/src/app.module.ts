@@ -7,6 +7,7 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { AcademicModule } from './academic/academic.module';
 import { EvaluationsModule } from './evaluations/evaluations.module';
+import { QuestionnairesModule } from './questionnaires/questionnaires.module';
 
 @Module({
   imports: [
@@ -38,6 +39,8 @@ import { EvaluationsModule } from './evaluations/evaluations.module';
     AcademicModule,
 
     EvaluationsModule,
+
+    QuestionnairesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
