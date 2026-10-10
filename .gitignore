@@ -14,3 +14,5 @@ frontend/.env
 # Sistema/editor
 .DS_Store
 Thumbs.db
+# TypeScript build cache
+*.tsbuildinfo
