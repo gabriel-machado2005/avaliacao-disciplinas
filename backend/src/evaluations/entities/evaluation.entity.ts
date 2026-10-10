@@ -1,4 +1,5 @@
 import {
+  Column,
   CreateDateColumn,
   Entity,
   JoinColumn,
@@ -33,6 +34,13 @@ export class Evaluation {
   })
   @JoinColumn({ name: 'questionnaire_id' })
   questionnaire: Questionnaire;
+
+  @Column({
+  name: 'min_responses_for_results',
+  type: 'int',
+  nullable: true,
+  })
+  minResponsesForResults: number | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
