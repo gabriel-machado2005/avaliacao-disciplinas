@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Req,
   UseGuards,
@@ -16,19 +17,16 @@ import { CreateEvaluationEligibilityDto } from './dto/create-evaluation-eligibil
 import { CreateEvaluationPeriodDto } from './dto/create-evaluation-period.dto';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { EvaluationsService } from './evaluations.service';
+import { UpdateEvaluationSettingsDto } from './dto/update-evaluation-settings.dto';
 
 @Controller('evaluations')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN, UserRole.COORDINATOR)
 export class EvaluationsController {
-  constructor(
-    private readonly evaluationsService: EvaluationsService,
-  ) {}
+  constructor(private readonly evaluationsService: EvaluationsService) {}
 
   @Post('periods')
-  createPeriod(
-    @Body() dto: CreateEvaluationPeriodDto,
-  ) {
+  createPeriod(@Body() dto: CreateEvaluationPeriodDto) {
     return this.evaluationsService.createPeriod(dto);
   }
 
@@ -38,9 +36,7 @@ export class EvaluationsController {
   }
 
   @Post()
-  createEvaluation(
-    @Body() dto: CreateEvaluationDto,
-  ) {
+  createEvaluation(@Body() dto: CreateEvaluationDto) {
     return this.evaluationsService.createEvaluation(dto);
   }
 
@@ -50,29 +46,19 @@ export class EvaluationsController {
   }
 
   @Post('eligibilities')
-  createEligibility(
-    @Body() dto: CreateEvaluationEligibilityDto,
-  ) {
+  createEligibility(@Body() dto: CreateEvaluationEligibilityDto) {
     return this.evaluationsService.createEligibility(dto);
   }
 
   @Get(':evaluationId/eligibilities')
-  findEligibilities(
-    @Param('evaluationId') evaluationId: string,
-  ) {
-    return this.evaluationsService.findEligibilities(
-      evaluationId,
-    );
+  findEligibilities(@Param('evaluationId') evaluationId: string) {
+    return this.evaluationsService.findEligibilities(evaluationId);
   }
 
   @Get('my')
   @Roles(UserRole.STUDENT)
-  findMyEvaluations(
-    @Req() req: any,
-  ) {
-    return this.evaluationsService.findMyEvaluations(
-      req.user.userId,
-    );
+  findMyEvaluations(@Req() req: any) {
+    return this.evaluationsService.findMyEvaluations(req.user.userId);
   }
 
   @Post(':evaluationId/submissions')
@@ -90,18 +76,16 @@ export class EvaluationsController {
   }
 
   @Get(':evaluationId/results')
-  @Roles(
-    UserRole.ADMIN,
-    UserRole.COORDINATOR,
-    UserRole.PROFESSOR,
-  )
-  getResults(
+  @Roles(UserRole.ADMIN, UserRole.COORDINATOR, UserRole.PROFESSOR)
+  getResults(@Param('evaluationId') evaluationId: string, @Req() req: any) {
+    return this.evaluationsService.getResults(evaluationId, req.user);
+  }
+
+  @Patch(':evaluationId/settings')
+  updateEvaluationSettings(
     @Param('evaluationId') evaluationId: string,
-    @Req() req: any,
+    @Body() dto: UpdateEvaluationSettingsDto,
   ) {
-    return this.evaluationsService.getResults(
-      evaluationId,
-      req.user,
-    );
+    return this.evaluationsService.updateEvaluationSettings(evaluationId, dto);
   }
 }
