@@ -255,6 +255,69 @@ export class EvaluationsService {
       },
     });
   }
+
+  async findQuestionnaireForStudent(evaluationId: string, studentId: string) {
+    const eligibility = await this.evaluationEligibilityRepository.findOne({
+      where: {
+        student: { id: studentId },
+        evaluation: { id: evaluationId },
+      },
+      relations: {
+        evaluation: {
+          evaluationPeriod: true,
+          questionnaire: {
+            dimensions: {
+              questions: true,
+            },
+          },
+        },
+      },
+    });
+
+    if (!eligibility) {
+      throw new NotFoundException(
+        'Avaliação não encontrada para este estudante.',
+      );
+    }
+
+    if (eligibility.completed) {
+      throw new BadRequestException('Você já respondeu esta avaliação.');
+    }
+
+    const evaluation = eligibility.evaluation;
+    const period = evaluation.evaluationPeriod;
+    const now = new Date();
+
+    if (
+      !period.active ||
+      now < new Date(period.startDate) ||
+      now > new Date(period.endDate)
+    ) {
+      throw new BadRequestException(
+        'Esta avaliação não está disponível para resposta.',
+      );
+    }
+
+    const questionnaire = evaluation.questionnaire;
+
+    if (!questionnaire || !questionnaire.active) {
+      throw new BadRequestException(
+        'O questionário desta avaliação não está disponível.',
+      );
+    }
+
+    questionnaire.dimensions.sort((a, b) => a.order - b.order);
+
+    for (const dimension of questionnaire.dimensions) {
+      dimension.questions.sort((a, b) => a.order - b.order);
+    }
+
+    return {
+      evaluationId: evaluation.id,
+      questionnaire,
+    };
+  }
+
   async submitEvaluation(
     evaluationId: string,
     studentId: string,

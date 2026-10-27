@@ -61,6 +61,18 @@ export class EvaluationsController {
     return this.evaluationsService.findMyEvaluations(req.user.userId);
   }
 
+  @Get(':evaluationId/questionnaire')
+  @Roles(UserRole.STUDENT)
+  getQuestionnaireForStudent(
+    @Param('evaluationId') evaluationId: string,
+    @Req() req: any,
+  ) {
+    return this.evaluationsService.findQuestionnaireForStudent(
+      evaluationId,
+      req.user.userId,
+    );
+  }
+
   @Post(':evaluationId/submissions')
   @Roles(UserRole.STUDENT)
   submitEvaluation(
