@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { FormEvent } from "react";
 
 type Question = {
   id: string;
@@ -8,6 +9,12 @@ type Question = {
   scaleMin: number | null;
   scaleMax: number | null;
   options: string[] | null;
+};
+type SubmissionAnswer = {
+  questionId: string;
+  scaleValue?: number;
+  choiceValue?: string;
+  textValue?: string;
 };
 
 export type QuestionnaireResponse = {
@@ -29,6 +36,9 @@ type Props = {
 
 export default function EvaluationQuestionnaire({ data, onBack }: Props) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState("");
 
   function updateAnswer(questionId: string, value: string) {
     setAnswers((previous) => ({
@@ -37,8 +47,101 @@ export default function EvaluationQuestionnaire({ data, onBack }: Props) {
     }));
   }
 
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (submitting || submitted) {
+      return;
+    }
+
+    setError("");
+
+    const questions = data.questionnaire.dimensions.flatMap(
+      (dimension) => dimension.questions,
+    );
+
+    const submissionAnswers = questions.flatMap(
+      (question): SubmissionAnswer[] => {
+        const value = answers[question.id]?.trim() ?? "";
+
+        if (!value) {
+          return [];
+        }
+
+        if (question.type === "SCALE") {
+          return [{ questionId: question.id, scaleValue: Number(value) }];
+        }
+
+        if (question.type === "SINGLE_CHOICE") {
+          return [{ questionId: question.id, choiceValue: value }];
+        }
+
+        return [{ questionId: question.id, textValue: value }];
+      },
+    );
+
+    setSubmitting(true);
+
+    try {
+      const token = sessionStorage.getItem("accessToken");
+
+      if (!token) {
+        throw new Error("Sua sessão terminou. Faça login novamente.");
+      }
+
+      const response = await fetch(
+        `http://localhost:3000/evaluations/${data.evaluationId}/submissions`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            answers: submissionAnswers,
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        const errorData: { message?: string | string[] } = await response
+          .json()
+          .catch(() => ({}));
+
+        const errorMessage = Array.isArray(errorData.message)
+          ? errorData.message.join(" ")
+          : errorData.message;
+
+        throw new Error(
+          errorMessage || `Não foi possível enviar (${response.status}).`,
+        );
+      }
+
+      setSubmitted(true);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Erro ao enviar avaliação.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (submitted) {
+    return (
+      <div>
+        <h2>Avaliação enviada!</h2>
+        <p>Suas respostas foram registradas com sucesso.</p>
+
+        <button type="button" onClick={onBack}>
+          Voltar às avaliações
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div>
+    <form onSubmit={handleSubmit}>
       <h2>{data.questionnaire.name}</h2>
 
       {data.questionnaire.dimensions.map((dimension) => (
@@ -115,9 +218,19 @@ export default function EvaluationQuestionnaire({ data, onBack }: Props) {
         </section>
       ))}
 
-      <button type="button" onClick={onBack}>
+      {error && (
+        <p role="alert" style={{ color: "#dc2626" }}>
+          {error}
+        </p>
+      )}
+
+      <button type="submit" disabled={submitting}>
+        {submitting ? "Enviando..." : "Enviar avaliação"}
+      </button>
+
+      <button type="button" onClick={onBack} disabled={submitting}>
         Voltar às avaliações
       </button>
-    </div>
+    </form>
   );
 }

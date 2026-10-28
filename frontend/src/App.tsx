@@ -46,6 +46,7 @@ function App() {
 
   const [questionnaireLoading, setQuestionnaireLoading] = useState(false);
   const [questionnaireError, setQuestionnaireError] = useState("");
+  const [refreshCount, setRefreshCount] = useState(0);
 
   useEffect(() => {
     if (!loggedInUser || loggedInUser.role !== "STUDENT") {
@@ -96,7 +97,7 @@ function App() {
     void loadEvaluations();
 
     return () => controller.abort();
-  }, [loggedInUser]);
+  }, [loggedInUser, refreshCount]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -192,7 +193,10 @@ function App() {
         <section className="login-card" style={{ maxWidth: "760px" }}>
           <EvaluationQuestionnaire
             data={questionnaireData}
-            onBack={() => setQuestionnaireData(null)}
+            onBack={() => {
+              setQuestionnaireData(null);
+              setRefreshCount((previous) => previous + 1);
+            }}
           />
         </section>
       </main>
