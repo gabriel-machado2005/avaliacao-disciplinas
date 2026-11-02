@@ -119,3 +119,75 @@ input {
   min-height: 100px;
   resize: vertical;
 }
+/* Área do estudante */
+.student-dashboard {
+  max-width: 800px;
+}
+
+.student-dashboard h2 {
+  margin-top: 32px;
+  margin-bottom: 20px;
+  font-size: 22px;
+}
+
+/* Lista de avaliações */
+.evaluation-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Cartão de cada avaliação */
+.evaluation-card {
+  padding: 20px;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.evaluation-card strong {
+  display: block;
+  font-size: 18px;
+  color: #1e293b;
+  margin-bottom: 12px;
+}
+
+.evaluation-card p {
+  margin: 8px 0;
+  color: #475569;
+  font-size: 14px;
+}
+
+.evaluation-card button {
+  margin-top: 16px;
+}
+/* Situação das avaliações */
+.evaluation-card .evaluation-status {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 10px;
+}
+
+/* Avaliação respondida */
+.evaluation-card .status-completed {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+/* Avaliação disponível */
+.evaluation-card .status-available {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+}
+
+/* Avaliação encerrada ou indisponível */
+.evaluation-card .status-inactive {
+  background-color: #e2e8f0;
+  color: #475569;
+}

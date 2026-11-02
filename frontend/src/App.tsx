@@ -24,7 +24,10 @@ type StudentEvaluation = {
       };
     };
     evaluationPeriod: {
+      name: string;
+      startDate: string;
       endDate: string;
+      active: boolean;
     };
   };
 };
@@ -36,7 +39,20 @@ function App() {
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const [loggedInUser, setLoggedInUser] = useState<User | null>(null);
+  const [loggedInUser, setLoggedInUser] = useState<User | null>(() => {
+    const storedUser = sessionStorage.getItem("user");
+    const storedToken = sessionStorage.getItem("accessToken");
+
+    if (!storedUser || !storedToken) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(storedUser) as User;
+    } catch {
+      return null;
+    }
+  });
   const [evaluations, setEvaluations] = useState<StudentEvaluation[]>([]);
   const [evaluationsLoading, setEvaluationsLoading] = useState(false);
   const [evaluationsError, setEvaluationsError] = useState("");
@@ -70,6 +86,20 @@ function App() {
         });
 
         if (!response.ok) {
+          if (response.status === 401) {
+            sessionStorage.removeItem("accessToken");
+            sessionStorage.removeItem("user");
+
+            if (!controller.signal.aborted) {
+              setLoggedInUser(null);
+              setEvaluations([]);
+              setSuccess(false);
+              setMessage("Sua sessão expirou. Faça login novamente.");
+            }
+
+            return;
+          }
+
           throw new Error("Não foi possível carregar as avaliações.");
         }
 
@@ -82,9 +112,11 @@ function App() {
       } catch (error) {
         if (!controller.signal.aborted) {
           setEvaluationsError(
-            error instanceof Error
-              ? error.message
-              : "Erro ao carregar avaliações.",
+            error instanceof TypeError
+              ? "Não foi possível conectar ao servidor. Tente novamente em instantes."
+              : error instanceof Error
+                ? error.message
+                : "Erro ao carregar avaliações.",
           );
         }
       } finally {
@@ -206,7 +238,7 @@ function App() {
   if (loggedInUser) {
     return (
       <main className="login-page">
-        <section className="login-card">
+        <section className="login-card student-dashboard">
           <h1>Olá, {loggedInUser.name}!</h1>
 
           <p>Bem-vindo(a) à Plataforma de Avaliação de Disciplinas.</p>
@@ -227,27 +259,48 @@ function App() {
           ) : evaluations.length === 0 ? (
             <p>Nenhuma avaliação encontrada para este estudante.</p>
           ) : (
-            <ul style={{ paddingLeft: "20px" }}>
+            <ul className="evaluation-list">
               {evaluations.map((item) => {
                 const classGroup = item.evaluation.classGroup;
-                const periodEnded =
-                  new Date(item.evaluation.evaluationPeriod.endDate).getTime() <
-                  loadedAt;
+                const period = item.evaluation.evaluationPeriod;
+
+                const hasStarted =
+                  loadedAt >= new Date(period.startDate).getTime();
+
+                const hasEnded = loadedAt > new Date(period.endDate).getTime();
+
+                const canRespond =
+                  !item.completed && period.active && hasStarted && !hasEnded;
 
                 const status = item.completed
                   ? "Respondida"
-                  : periodEnded
-                    ? "Período encerrado"
-                    : "Ainda não respondida";
+                  : !period.active
+                    ? "Indisponível"
+                    : !hasStarted
+                      ? "Ainda não iniciada"
+                      : hasEnded
+                        ? "Período encerrado"
+                        : "Disponível para responder";
 
                 return (
-                  <li key={item.id}>
+                  <li key={item.id} className="evaluation-card">
                     <strong>{classGroup.discipline.name}</strong>
 
                     <p>Turma: {classGroup.code}</p>
+                    <p>Período: {item.evaluation.evaluationPeriod.name}</p>
                     <p>Professor: {classGroup.professor.name}</p>
-                    <p>Situação: {status}</p>
-                    {!item.completed && !periodEnded && (
+                    <p
+                      className={`evaluation-status ${
+                        item.completed
+                          ? "status-completed"
+                          : canRespond
+                            ? "status-available"
+                            : "status-inactive"
+                      }`}
+                    >
+                      Situação: {status}
+                    </p>
+                    {canRespond && (
                       <button
                         type="button"
                         disabled={questionnaireLoading}
