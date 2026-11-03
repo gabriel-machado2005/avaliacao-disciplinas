@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import EvaluationQuestionnaire, {
   type QuestionnaireResponse,
 } from "./EvaluationQuestionnaire";
+import ProfessorEvaluations from "./ProfessorEvaluations";
 
 type User = {
   name: string;
@@ -230,6 +231,26 @@ function App() {
               setRefreshCount((previous) => previous + 1);
             }}
           />
+        </section>
+      </main>
+    );
+  }
+
+  if (loggedInUser?.role === "PROFESSOR") {
+    return (
+      <main className="login-page">
+        <section className="login-card student-dashboard">
+          <h1>Olá, {loggedInUser.name}!</h1>
+
+          <p>Bem-vindo(a) à Plataforma de Avaliação de Disciplinas.</p>
+
+          <h2>Avaliações das minhas turmas</h2>
+
+          <ProfessorEvaluations />
+
+          <button type="button" onClick={handleLogout}>
+            Sair
+          </button>
         </section>
       </main>
     );

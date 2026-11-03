@@ -45,6 +45,12 @@ export class EvaluationsController {
     return this.evaluationsService.findEvaluations();
   }
 
+  @Get('professor/my')
+  @Roles(UserRole.PROFESSOR)
+  findProfessorEvaluations(@Req() req: any) {
+    return this.evaluationsService.findProfessorEvaluations(req.user.userId);
+  }
+
   @Post('eligibilities')
   createEligibility(@Body() dto: CreateEvaluationEligibilityDto) {
     return this.evaluationsService.createEligibility(dto);

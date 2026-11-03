@@ -149,6 +149,33 @@ export class EvaluationsService {
       },
     });
   }
+
+  findProfessorEvaluations(professorId: string) {
+    return this.evaluationRepository.find({
+      where: {
+        classGroup: {
+          professor: {
+            id: professorId,
+          },
+        },
+      },
+      relations: {
+        evaluationPeriod: true,
+        classGroup: {
+          discipline: {
+            course: true,
+          },
+          professor: true,
+          academicTerm: true,
+        },
+        questionnaire: true,
+      },
+      order: {
+        createdAt: 'DESC',
+      },
+    });
+  }
+
   async createEligibility(dto: CreateEvaluationEligibilityDto) {
     const evaluation = await this.evaluationRepository.findOne({
       where: {
