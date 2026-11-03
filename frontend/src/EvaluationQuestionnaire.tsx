@@ -202,16 +202,34 @@ export default function EvaluationQuestionnaire({ data, onBack }: Props) {
               )}
 
               {question.type === "TEXT" && (
-                <textarea
-                  id={question.id}
-                  rows={4}
-                  placeholder="Digite seu comentário (opcional)"
-                  value={answers[question.id] ?? ""}
-                  onChange={(event) =>
-                    updateAnswer(question.id, event.target.value)
-                  }
-                  required={question.required}
-                />
+                <div>
+                  <textarea
+                    id={question.id}
+                    rows={4}
+                    placeholder="Digite seu comentário (opcional)"
+                    value={answers[question.id] ?? ""}
+                    onChange={(event) =>
+                      updateAnswer(question.id, event.target.value)
+                    }
+                    maxLength={1000}
+                    required={question.required}
+                    aria-describedby={`privacy-${question.id}`}
+                  />
+
+                  <p
+                    id={`privacy-${question.id}`}
+                    style={{
+                      fontSize: "12px",
+                      color: "#64748b",
+                      marginTop: "6px",
+                      lineHeight: "1.5",
+                    }}
+                  >
+                    Para preservar seu anonimato, evite informar nomes, dados
+                    pessoais ou situações que possam identificar você ou outras
+                    pessoas.
+                  </p>
+                </div>
               )}
             </div>
           ))}

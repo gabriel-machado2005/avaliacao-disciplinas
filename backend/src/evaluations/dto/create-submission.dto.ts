@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -23,6 +24,9 @@ export class SubmissionAnswerDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(1000, {
+    message: 'O comentário deve ter no máximo 1000 caracteres.',
+  })
   textValue?: string;
 }
 
