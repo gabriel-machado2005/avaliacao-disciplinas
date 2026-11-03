@@ -256,6 +256,32 @@ function App() {
     );
   }
 
+  if (loggedInUser?.role === "COORDINATOR" || loggedInUser?.role === "ADMIN") {
+    return (
+      <main className="login-page">
+        <section className="login-card student-dashboard">
+          <h1>Olá, {loggedInUser.name}!</h1>
+
+          <p>Bem-vindo(a) à Plataforma de Avaliação de Disciplinas.</p>
+
+          <h2>
+            {loggedInUser.role === "ADMIN"
+              ? "Painel do administrador"
+              : "Painel do coordenador"}
+          </h2>
+
+          <p>Consulte as avaliações e seus resultados consolidados.</p>
+
+          <ProfessorEvaluations role={loggedInUser.role} />
+
+          <button type="button" onClick={handleLogout}>
+            Sair
+          </button>
+        </section>
+      </main>
+    );
+  }
+
   if (loggedInUser) {
     return (
       <main className="login-page">

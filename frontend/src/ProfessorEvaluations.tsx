@@ -18,7 +18,11 @@ type ProfessorEvaluation = {
   };
 };
 
-export default function ProfessorEvaluations() {
+type Props = {
+  role?: "PROFESSOR" | "COORDINATOR" | "ADMIN";
+};
+
+export default function ProfessorEvaluations({ role = "PROFESSOR" }: Props) {
   const [evaluations, setEvaluations] = useState<ProfessorEvaluation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -37,15 +41,17 @@ export default function ProfessorEvaluations() {
           throw new Error("Faça login novamente para continuar.");
         }
 
-        const response = await fetch(
-          "http://localhost:3000/evaluations/professor/my",
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-            signal: controller.signal,
+        const endpoint =
+          role === "PROFESSOR"
+            ? "http://localhost:3000/evaluations/professor/my"
+            : "http://localhost:3000/evaluations";
+
+        const response = await fetch(endpoint, {
+          headers: {
+            Authorization: `Bearer ${token}`,
           },
-        );
+          signal: controller.signal,
+        });
 
         if (!response.ok) {
           throw new Error("Não foi possível carregar as avaliações.");
@@ -72,7 +78,7 @@ export default function ProfessorEvaluations() {
     void loadEvaluations();
 
     return () => controller.abort();
-  }, []);
+  }, [role]);
 
   if (selectedEvaluationId) {
     return (
