@@ -1,12 +1,9 @@
-import {
-  BadRequestException,
-  Injectable,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { Repository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
-import { User } from './entities/user.entity';
+import { User, UserRole } from './entities/user.entity';
 
 @Injectable()
 export class UsersService {
@@ -44,11 +41,28 @@ export class UsersService {
       createdAt: savedUser.createdAt,
     };
   }
+
+  findProfessors() {
+    return this.usersRepository.find({
+      select: {
+        id: true,
+        name: true,
+      },
+      where: {
+        role: UserRole.PROFESSOR,
+        active: true,
+      },
+      order: {
+        name: 'ASC',
+      },
+    });
+  }
+
   async findByEmailWithPassword(email: string) {
-  return this.usersRepository
-    .createQueryBuilder('user')
-    .addSelect('user.passwordHash')
-    .where('user.email = :email', { email })
-    .getOne();
-    }
+    return this.usersRepository
+      .createQueryBuilder('user')
+      .addSelect('user.passwordHash')
+      .where('user.email = :email', { email })
+      .getOne();
+  }
 }

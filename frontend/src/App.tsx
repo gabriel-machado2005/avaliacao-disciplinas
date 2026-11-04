@@ -4,6 +4,7 @@ import EvaluationQuestionnaire, {
   type QuestionnaireResponse,
 } from "./EvaluationQuestionnaire";
 import ProfessorEvaluations from "./ProfessorEvaluations";
+import AdministrativePanel from "./AdministrativePanel";
 
 type User = {
   name: string;
@@ -272,7 +273,7 @@ function App() {
 
           <p>Consulte as avaliações e seus resultados consolidados.</p>
 
-          <ProfessorEvaluations role={loggedInUser.role} />
+          <AdministrativePanel role={loggedInUser.role} />
 
           <button type="button" onClick={handleLogout}>
             Sair
