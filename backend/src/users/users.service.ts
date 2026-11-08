@@ -58,6 +58,22 @@ export class UsersService {
     });
   }
 
+  findStudents() {
+    return this.usersRepository.find({
+      select: {
+        id: true,
+        name: true,
+      },
+      where: {
+        role: UserRole.STUDENT,
+        active: true,
+      },
+      order: {
+        name: 'ASC',
+      },
+    });
+  }
+
   async findByEmailWithPassword(email: string) {
     return this.usersRepository
       .createQueryBuilder('user')

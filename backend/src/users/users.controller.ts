@@ -23,4 +23,11 @@ export class UsersController {
   findProfessors() {
     return this.usersService.findProfessors();
   }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.COORDINATOR)
+  @Get('students')
+  findStudents() {
+    return this.usersService.findStudents();
+  }
 }

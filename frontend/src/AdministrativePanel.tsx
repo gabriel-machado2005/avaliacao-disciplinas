@@ -4,12 +4,24 @@ import AcademicCourses from "./AcademicCourses";
 import AcademicDisciplines from "./AcademicDisciplines";
 import AcademicTerms from "./AcademicTerms";
 import AcademicClasses from "./AcademicClasses";
+import EvaluationPeriods from "./EvaluationPeriods";
+import EvaluationManagement from "./EvaluationManagement";
+import QuestionnaireManagement from "./QuestionnaireManagement";
+import EvaluationEligibilities from "./EvaluationEligibilities";
 
 type Props = {
   role: "ADMIN" | "COORDINATOR";
 };
 
-type Section = "evaluations" | "courses" | "disciplines" | "terms" | "classes";
+type Section =
+  | "evaluations"
+  | "courses"
+  | "disciplines"
+  | "terms"
+  | "classes"
+  | "periods"
+  | "questionnaires"
+  | "eligibilities";
 
 export default function AdministrativePanel({ role }: Props) {
   const [activeSection, setActiveSection] = useState<Section>("evaluations");
@@ -64,18 +76,53 @@ export default function AdministrativePanel({ role }: Props) {
         >
           Gerenciar turmas
         </button>
+
+        <button
+          type="button"
+          aria-pressed={activeSection === "periods"}
+          onClick={() => setActiveSection("periods")}
+        >
+          Gerenciar períodos
+        </button>
+
+        <button
+          type="button"
+          aria-pressed={activeSection === "questionnaires"}
+          onClick={() => setActiveSection("questionnaires")}
+        >
+          Gerenciar questionários
+        </button>
+        <button
+          type="button"
+          aria-pressed={activeSection === "eligibilities"}
+          onClick={() => setActiveSection("eligibilities")}
+        >
+          Gerenciar estudantes habilitados
+        </button>
       </nav>
 
       {activeSection === "evaluations" ? (
-        <ProfessorEvaluations role={role} />
+        <>
+          <EvaluationManagement />
+
+          <h2 style={{ marginTop: "32px" }}>Avaliações cadastradas</h2>
+
+          <ProfessorEvaluations role={role} />
+        </>
       ) : activeSection === "courses" ? (
         <AcademicCourses />
       ) : activeSection === "disciplines" ? (
         <AcademicDisciplines />
       ) : activeSection === "terms" ? (
         <AcademicTerms />
-      ) : (
+      ) : activeSection === "classes" ? (
         <AcademicClasses />
+      ) : activeSection === "periods" ? (
+        <EvaluationPeriods />
+      ) : activeSection === "eligibilities" ? (
+        <EvaluationEligibilities />
+      ) : (
+        <QuestionnaireManagement />
       )}
     </div>
   );

@@ -232,6 +232,7 @@ export class EvaluationsService {
 
     return this.evaluationEligibilityRepository.save(eligibility);
   }
+
   async findEligibilities(evaluationId: string) {
     const evaluation = await this.evaluationRepository.findOne({
       where: {
@@ -243,7 +244,7 @@ export class EvaluationsService {
       throw new NotFoundException('Avaliação não encontrada.');
     }
 
-    return this.evaluationEligibilityRepository.find({
+    const eligibilities = await this.evaluationEligibilityRepository.find({
       where: {
         evaluation: {
           id: evaluationId,
@@ -256,7 +257,18 @@ export class EvaluationsService {
         createdAt: 'DESC',
       },
     });
+
+    return eligibilities.map((eligibility) => ({
+      id: eligibility.id,
+      completed: eligibility.completed,
+      createdAt: eligibility.createdAt,
+      student: {
+        id: eligibility.student.id,
+        name: eligibility.student.name,
+      },
+    }));
   }
+
   async findMyEvaluations(studentId: string) {
     return this.evaluationEligibilityRepository.find({
       where: {
