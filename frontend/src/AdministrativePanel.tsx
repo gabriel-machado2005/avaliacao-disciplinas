@@ -110,7 +110,7 @@ export default function AdministrativePanel({ role }: Props) {
           <ProfessorEvaluations role={role} />
         </>
       ) : activeSection === "courses" ? (
-        <AcademicCourses />
+        <AcademicCourses role={role} />
       ) : activeSection === "disciplines" ? (
         <AcademicDisciplines />
       ) : activeSection === "terms" ? (

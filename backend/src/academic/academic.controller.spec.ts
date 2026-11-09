@@ -9,6 +9,8 @@ describe('AcademicController', () => {
 
   const academicServiceMock = {
     createCourse: jest.fn(),
+    updateCourse: jest.fn(),
+    deleteCourse: jest.fn(),
     findCourses: jest.fn(),
     createDiscipline: jest.fn(),
     findDisciplines: jest.fn(),
@@ -83,6 +85,51 @@ describe('AcademicController', () => {
 
       expect(academicServiceMock.findCourses).toHaveBeenCalledTimes(1);
       expect(result).toEqual(courses);
+    });
+
+    it('deve encaminhar a edição de um curso ao serviço', async () => {
+      const courseId = '550e8400-e29b-41d4-a716-446655440000';
+
+      const dto = {
+        name: 'Bacharelado em Ciência da Computação',
+      };
+
+      const updatedCourse = {
+        id: courseId,
+        code: 'CC',
+        name: dto.name,
+      };
+
+      academicServiceMock.updateCourse.mockResolvedValue(updatedCourse);
+
+      const result = await controller.updateCourse(courseId, dto);
+
+      expect(academicServiceMock.updateCourse).toHaveBeenCalledWith(
+        courseId,
+        dto,
+      );
+
+      expect(academicServiceMock.updateCourse).toHaveBeenCalledTimes(1);
+
+      expect(result).toEqual(updatedCourse);
+    });
+
+    it('deve encaminhar a exclusão de um curso ao serviço', async () => {
+      const courseId = '550e8400-e29b-41d4-a716-446655440000';
+
+      const response = {
+        message: 'Curso excluído com sucesso.',
+      };
+
+      academicServiceMock.deleteCourse.mockResolvedValue(response);
+
+      const result = await controller.deleteCourse(courseId);
+
+      expect(academicServiceMock.deleteCourse).toHaveBeenCalledWith(courseId);
+
+      expect(academicServiceMock.deleteCourse).toHaveBeenCalledTimes(1);
+
+      expect(result).toEqual(response);
     });
   });
 

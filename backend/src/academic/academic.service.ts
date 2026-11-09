@@ -1,14 +1,12 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import {
-  User,
-  UserRole,
-} from '../users/entities/user.entity';
+import { QueryFailedError, Repository } from 'typeorm';
+import { User, UserRole } from '../users/entities/user.entity';
 import { CreateAcademicTermDto } from './dto/create-academic-term.dto';
 import { CreateClassGroupDto } from './dto/create-class-group.dto';
 import { CreateCourseDto } from './dto/create-course.dto';
@@ -17,6 +15,7 @@ import { AcademicTerm } from './entities/academic-term.entity';
 import { ClassGroup } from './entities/class-group.entity';
 import { Course } from './entities/course.entity';
 import { Discipline } from './entities/discipline.entity';
+import { UpdateCourseDto } from './dto/update-course.dto';
 
 @Injectable()
 export class AcademicService {
@@ -46,9 +45,84 @@ export class AcademicService {
       throw new BadRequestException('Código de curso já cadastrado.');
     }
 
-    return this.courseRepository.save(
-      this.courseRepository.create(dto),
-    );
+    return this.courseRepository.save(this.courseRepository.create(dto));
+  }
+
+  async updateCourse(id: string, dto: UpdateCourseDto) {
+    const course = await this.courseRepository.findOne({
+      where: { id },
+    });
+
+    if (!course) {
+      throw new NotFoundException('Curso não encontrado.');
+    }
+
+    if (dto.code === undefined && dto.name === undefined) {
+      throw new BadRequestException(
+        'Informe pelo menos um campo para atualizar.',
+      );
+    }
+
+    if (dto.code !== undefined && dto.code !== course.code) {
+      const existing = await this.courseRepository.findOne({
+        where: { code: dto.code },
+      });
+
+      if (existing && existing.id !== id) {
+        throw new BadRequestException('Código de curso já cadastrado.');
+      }
+
+      course.code = dto.code;
+    }
+
+    if (dto.name !== undefined) {
+      course.name = dto.name;
+    }
+
+    return this.courseRepository.save(course);
+  }
+
+  async deleteCourse(id: string) {
+    const course = await this.courseRepository.findOne({
+      where: { id },
+    });
+
+    if (!course) {
+      throw new NotFoundException('Curso não encontrado.');
+    }
+
+    const linkedDisciplines = await this.disciplineRepository.count({
+      where: {
+        course: { id },
+      },
+    });
+
+    if (linkedDisciplines > 0) {
+      throw new ConflictException(
+        'Não é possível excluir este curso porque existem disciplinas vinculadas a ele.',
+      );
+    }
+
+    try {
+      const result = await this.courseRepository.delete(id);
+
+      if (result.affected === 0) {
+        throw new NotFoundException('Curso não encontrado.');
+      }
+    } catch (error) {
+      if (
+        error instanceof QueryFailedError &&
+        (error.driverError as { code?: string }).code === '23503'
+      ) {
+        throw new ConflictException(
+          'Não é possível excluir este curso porque existem registros vinculados a ele.',
+        );
+      }
+
+      throw error;
+    }
+
+    return { message: 'Curso excluído com sucesso.' };
   }
 
   findCourses() {
@@ -71,9 +145,7 @@ export class AcademicService {
     });
 
     if (existing) {
-      throw new BadRequestException(
-        'Código de disciplina já cadastrado.',
-      );
+      throw new BadRequestException('Código de disciplina já cadastrado.');
     }
 
     const discipline = this.disciplineRepository.create({
@@ -108,9 +180,7 @@ export class AcademicService {
     });
 
     if (existing) {
-      throw new BadRequestException(
-        'Período letivo já cadastrado.',
-      );
+      throw new BadRequestException('Período letivo já cadastrado.');
     }
 
     return this.academicTermRepository.save(
@@ -143,24 +213,18 @@ export class AcademicService {
       throw new NotFoundException('Professor não encontrado.');
     }
 
-    if (
-      professor.role !== UserRole.PROFESSOR ||
-      !professor.active
-    ) {
+    if (professor.role !== UserRole.PROFESSOR || !professor.active) {
       throw new BadRequestException(
         'O usuário informado deve ser um professor ativo.',
       );
     }
 
-    const academicTerm =
-      await this.academicTermRepository.findOne({
-        where: { id: dto.academicTermId },
-      });
+    const academicTerm = await this.academicTermRepository.findOne({
+      where: { id: dto.academicTermId },
+    });
 
     if (!academicTerm) {
-      throw new NotFoundException(
-        'Período letivo não encontrado.',
-      );
+      throw new NotFoundException('Período letivo não encontrado.');
     }
 
     const classGroup = this.classGroupRepository.create({

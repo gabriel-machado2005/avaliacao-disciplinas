@@ -1,4 +1,8 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { User, UserRole } from '../users/entities/user.entity';
@@ -7,6 +11,7 @@ import { AcademicTerm } from './entities/academic-term.entity';
 import { ClassGroup } from './entities/class-group.entity';
 import { Course } from './entities/course.entity';
 import { Discipline } from './entities/discipline.entity';
+import { QueryFailedError } from 'typeorm';
 
 describe('AcademicService', () => {
   let service: AcademicService;
@@ -16,6 +21,8 @@ describe('AcademicService', () => {
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
+    count: jest.fn(),
+    delete: jest.fn(),
   });
 
   let courseRepositoryMock: ReturnType<typeof createRepositoryMock>;
@@ -125,6 +132,218 @@ describe('AcademicService', () => {
       expect(courseRepositoryMock.find).toHaveBeenCalledWith({
         order: { name: 'ASC' },
       });
+    });
+
+    it('deve atualizar o nome de um curso existente', async () => {
+      const course = {
+        id: 'course-id-1',
+        code: 'CC',
+        name: 'Ciência da Computação',
+      };
+
+      const updatedCourse = {
+        ...course,
+        name: 'Bacharelado em Ciência da Computação',
+      };
+
+      courseRepositoryMock.findOne.mockResolvedValue(course);
+      courseRepositoryMock.save.mockResolvedValue(updatedCourse);
+
+      const result = await service.updateCourse(course.id, {
+        name: updatedCourse.name,
+      });
+
+      expect(courseRepositoryMock.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: course.id,
+          code: 'CC',
+          name: updatedCourse.name,
+        }),
+      );
+
+      expect(result).toEqual(updatedCourse);
+    });
+
+    it('deve permitir alterar o código de um curso', async () => {
+      const course = {
+        id: 'course-id-1',
+        code: 'CC',
+        name: 'Ciência da Computação',
+      };
+
+      courseRepositoryMock.findOne
+        .mockResolvedValueOnce(course)
+        .mockResolvedValueOnce(null);
+
+      courseRepositoryMock.save.mockImplementation(async (value) => value);
+
+      const result = await service.updateCourse(course.id, {
+        code: 'CCOMP',
+      });
+
+      expect(courseRepositoryMock.findOne).toHaveBeenCalledWith({
+        where: { code: 'CCOMP' },
+      });
+
+      expect(result.code).toBe('CCOMP');
+      expect(result.name).toBe('Ciência da Computação');
+    });
+
+    it('deve rejeitar um código de curso já utilizado', async () => {
+      const course = {
+        id: 'course-id-1',
+        code: 'CC',
+        name: 'Ciência da Computação',
+      };
+
+      const otherCourse = {
+        id: 'course-id-2',
+        code: 'ADM',
+        name: 'Administração',
+      };
+
+      courseRepositoryMock.findOne
+        .mockResolvedValueOnce(course)
+        .mockResolvedValueOnce(otherCourse);
+
+      await expect(
+        service.updateCourse(course.id, { code: 'ADM' }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(courseRepositoryMock.save).not.toHaveBeenCalled();
+    });
+
+    it('deve rejeitar a edição de um curso inexistente', async () => {
+      courseRepositoryMock.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.updateCourse('invalid-course-id', {
+          name: 'Novo nome',
+        }),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(courseRepositoryMock.save).not.toHaveBeenCalled();
+    });
+
+    it('deve rejeitar uma atualização sem campos', async () => {
+      courseRepositoryMock.findOne.mockResolvedValue({
+        id: 'course-id-1',
+        code: 'CC',
+        name: 'Ciência da Computação',
+      });
+
+      await expect(service.updateCourse('course-id-1', {})).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(courseRepositoryMock.save).not.toHaveBeenCalled();
+    });
+
+    it('deve excluir um curso sem disciplinas vinculadas', async () => {
+      const courseId = 'course-id-1';
+
+      courseRepositoryMock.findOne.mockResolvedValue({
+        id: courseId,
+        code: 'TESTE',
+        name: 'Curso de Teste',
+      });
+
+      disciplineRepositoryMock.count.mockResolvedValue(0);
+      courseRepositoryMock.delete.mockResolvedValue({ affected: 1 });
+
+      const result = await service.deleteCourse(courseId);
+
+      expect(disciplineRepositoryMock.count).toHaveBeenCalledWith({
+        where: {
+          course: { id: courseId },
+        },
+      });
+
+      expect(courseRepositoryMock.delete).toHaveBeenCalledWith(courseId);
+
+      expect(result).toEqual({
+        message: 'Curso excluído com sucesso.',
+      });
+    });
+
+    it('deve impedir a exclusão de um curso com disciplinas', async () => {
+      const courseId = 'course-id-1';
+
+      courseRepositoryMock.findOne.mockResolvedValue({
+        id: courseId,
+        code: 'CC',
+        name: 'Ciência da Computação',
+      });
+
+      disciplineRepositoryMock.count.mockResolvedValue(2);
+
+      await expect(service.deleteCourse(courseId)).rejects.toThrow(
+        ConflictException,
+      );
+
+      expect(courseRepositoryMock.delete).not.toHaveBeenCalled();
+    });
+
+    it('deve rejeitar a exclusão de um curso inexistente', async () => {
+      courseRepositoryMock.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.deleteCourse('course-id-inexistente'),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(disciplineRepositoryMock.count).not.toHaveBeenCalled();
+      expect(courseRepositoryMock.delete).not.toHaveBeenCalled();
+    });
+
+    it('deve tratar exclusão sem registro afetado', async () => {
+      const courseId = 'course-id-1';
+
+      courseRepositoryMock.findOne.mockResolvedValue({
+        id: courseId,
+        code: 'TESTE',
+        name: 'Curso de Teste',
+      });
+
+      disciplineRepositoryMock.count.mockResolvedValue(0);
+      courseRepositoryMock.delete.mockResolvedValue({ affected: 0 });
+
+      await expect(service.deleteCourse(courseId)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('deve tratar erro de chave estrangeira ao excluir um curso', async () => {
+      const courseId = 'course-id-1';
+
+      courseRepositoryMock.findOne.mockResolvedValue({
+        id: courseId,
+        code: 'TESTE',
+        name: 'Curso de Teste',
+      });
+
+      disciplineRepositoryMock.count.mockResolvedValue(0);
+
+      const driverError = Object.assign(
+        new Error('Violação de chave estrangeira.'),
+        {
+          code: '23503',
+          detail: 'Registro referenciado por uma chave estrangeira.',
+        },
+      );
+
+      const databaseError = new QueryFailedError(
+        'DELETE FROM courses WHERE id = $1',
+        [courseId],
+        driverError,
+      );
+
+      courseRepositoryMock.delete.mockRejectedValue(databaseError);
+
+      await expect(service.deleteCourse(courseId)).rejects.toThrow(
+        ConflictException,
+      );
+
+      expect(courseRepositoryMock.delete).toHaveBeenCalledWith(courseId);
     });
   });
 
