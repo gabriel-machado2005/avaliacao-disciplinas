@@ -9,7 +9,7 @@ describe('RolesGuard - permissões acadêmicas', () => {
   const guard = new RolesGuard(reflector);
 
   function createContext(
-    method: 'deleteCourse' | 'findCourses',
+    method: 'deleteCourse' | 'deleteDiscipline' | 'findCourses',
     role: UserRole,
   ): ExecutionContext {
     return {
@@ -43,6 +43,18 @@ describe('RolesGuard - permissões acadêmicas', () => {
 
   it('deve impedir que um estudante consulte cursos pelo módulo administrativo', () => {
     const context = createContext('findCourses', UserRole.STUDENT);
+
+    expect(guard.canActivate(context)).toBe(false);
+  });
+
+  it('deve permitir que um administrador exclua disciplinas', () => {
+    const context = createContext('deleteDiscipline', UserRole.ADMIN);
+
+    expect(guard.canActivate(context)).toBe(true);
+  });
+
+  it('deve impedir que um coordenador exclua disciplinas', () => {
+    const context = createContext('deleteDiscipline', UserRole.COORDINATOR);
 
     expect(guard.canActivate(context)).toBe(false);
   });

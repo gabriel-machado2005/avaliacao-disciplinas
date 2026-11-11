@@ -13,6 +13,8 @@ describe('AcademicController', () => {
     deleteCourse: jest.fn(),
     findCourses: jest.fn(),
     createDiscipline: jest.fn(),
+    updateDiscipline: jest.fn(),
+    deleteDiscipline: jest.fn(),
     findDisciplines: jest.fn(),
     createAcademicTerm: jest.fn(),
     findAcademicTerms: jest.fn(),
@@ -170,6 +172,56 @@ describe('AcademicController', () => {
 
       expect(academicServiceMock.findDisciplines).toHaveBeenCalledTimes(1);
       expect(result).toEqual(disciplines);
+    });
+
+    it('deve encaminhar a edição de uma disciplina ao serviço', async () => {
+      const disciplineId = '550e8400-e29b-41d4-a716-446655440000';
+
+      const dto = {
+        name: 'Engenharia de Software I',
+      };
+
+      const updatedDiscipline = {
+        id: disciplineId,
+        code: 'ENGSOFT',
+        name: dto.name,
+        course: {
+          id: 'course-id-1',
+        },
+      };
+
+      academicServiceMock.updateDiscipline.mockResolvedValue(updatedDiscipline);
+
+      const result = await controller.updateDiscipline(disciplineId, dto);
+
+      expect(academicServiceMock.updateDiscipline).toHaveBeenCalledWith(
+        disciplineId,
+        dto,
+      );
+
+      expect(academicServiceMock.updateDiscipline).toHaveBeenCalledTimes(1);
+
+      expect(result).toEqual(updatedDiscipline);
+    });
+
+    it('deve encaminhar a exclusão de uma disciplina ao serviço', async () => {
+      const disciplineId = '550e8400-e29b-41d4-a716-446655440000';
+
+      const response = {
+        message: 'Disciplina excluída com sucesso.',
+      };
+
+      academicServiceMock.deleteDiscipline.mockResolvedValue(response);
+
+      const result = await controller.deleteDiscipline(disciplineId);
+
+      expect(academicServiceMock.deleteDiscipline).toHaveBeenCalledWith(
+        disciplineId,
+      );
+
+      expect(academicServiceMock.deleteDiscipline).toHaveBeenCalledTimes(1);
+
+      expect(result).toEqual(response);
     });
   });
 

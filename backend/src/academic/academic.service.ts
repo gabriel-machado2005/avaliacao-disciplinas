@@ -16,6 +16,7 @@ import { ClassGroup } from './entities/class-group.entity';
 import { Course } from './entities/course.entity';
 import { Discipline } from './entities/discipline.entity';
 import { UpdateCourseDto } from './dto/update-course.dto';
+import { UpdateDisciplineDto } from './dto/update-discipline.dto';
 
 @Injectable()
 export class AcademicService {
@@ -155,6 +156,116 @@ export class AcademicService {
     });
 
     return this.disciplineRepository.save(discipline);
+  }
+
+  async updateDiscipline(id: string, dto: UpdateDisciplineDto) {
+    const discipline = await this.disciplineRepository.findOne({
+      where: { id },
+      relations: {
+        course: true,
+      },
+    });
+
+    if (!discipline) {
+      throw new NotFoundException('Disciplina não encontrada.');
+    }
+
+    if (
+      dto.code === undefined &&
+      dto.name === undefined &&
+      dto.courseId === undefined
+    ) {
+      throw new BadRequestException(
+        'Informe pelo menos um campo para atualizar.',
+      );
+    }
+
+    if (dto.code !== undefined && dto.code !== discipline.code) {
+      const existing = await this.disciplineRepository.findOne({
+        where: { code: dto.code },
+      });
+
+      if (existing && existing.id !== id) {
+        throw new BadRequestException('Código de disciplina já cadastrado.');
+      }
+
+      discipline.code = dto.code;
+    }
+
+    if (dto.courseId !== undefined) {
+      const course = await this.courseRepository.findOne({
+        where: { id: dto.courseId },
+      });
+
+      if (!course) {
+        throw new NotFoundException('Curso não encontrado.');
+      }
+
+      if (discipline.course?.id !== course.id) {
+        const linkedClasses = await this.classGroupRepository.count({
+          where: {
+            discipline: { id },
+          },
+        });
+
+        if (linkedClasses > 0) {
+          throw new ConflictException(
+            'Não é possível alterar o curso desta disciplina porque existem turmas vinculadas a ela.',
+          );
+        }
+      }
+
+      discipline.course = course;
+    }
+
+    if (dto.name !== undefined) {
+      discipline.name = dto.name;
+    }
+
+    return this.disciplineRepository.save(discipline);
+  }
+
+  async deleteDiscipline(id: string) {
+    const discipline = await this.disciplineRepository.findOne({
+      where: { id },
+    });
+
+    if (!discipline) {
+      throw new NotFoundException('Disciplina não encontrada.');
+    }
+
+    const linkedClasses = await this.classGroupRepository.count({
+      where: {
+        discipline: { id },
+      },
+    });
+
+    if (linkedClasses > 0) {
+      throw new ConflictException(
+        'Não é possível excluir esta disciplina porque existem turmas vinculadas a ela.',
+      );
+    }
+
+    try {
+      const result = await this.disciplineRepository.delete(id);
+
+      if (result.affected === 0) {
+        throw new NotFoundException('Disciplina não encontrada.');
+      }
+    } catch (error) {
+      if (
+        error instanceof QueryFailedError &&
+        (error.driverError as { code?: string }).code === '23503'
+      ) {
+        throw new ConflictException(
+          'Não é possível excluir esta disciplina porque existem registros vinculados a ela.',
+        );
+      }
+
+      throw error;
+    }
+
+    return { message: 'Disciplina excluída com sucesso.' };
   }
 
   findDisciplines() {

@@ -454,6 +454,301 @@ describe('AcademicService', () => {
         },
       });
     });
+
+    it('deve atualizar o nome de uma disciplina existente', async () => {
+      const discipline = {
+        id: 'discipline-id-1',
+        code: 'ENGSOFT',
+        name: 'Engenharia de Software',
+        course: { id: 'course-id-1' },
+      };
+
+      disciplineRepositoryMock.findOne.mockResolvedValue(discipline);
+      disciplineRepositoryMock.save.mockImplementation(async (value) => value);
+
+      const result = await service.updateDiscipline(discipline.id, {
+        name: 'Engenharia de Software I',
+      });
+
+      expect(result.name).toBe('Engenharia de Software I');
+      expect(result.code).toBe('ENGSOFT');
+      expect(result.course.id).toBe('course-id-1');
+      expect(disciplineRepositoryMock.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('deve permitir alterar o curso de uma disciplina', async () => {
+      const discipline = {
+        id: 'discipline-id-1',
+        code: 'ENGSOFT',
+        name: 'Engenharia de Software',
+        course: { id: 'course-id-1' },
+      };
+
+      const newCourse = {
+        id: 'course-id-2',
+        code: 'SI',
+        name: 'Sistemas de Informação',
+      };
+
+      disciplineRepositoryMock.findOne.mockResolvedValue(discipline);
+      courseRepositoryMock.findOne.mockResolvedValue(newCourse);
+      classGroupRepositoryMock.count.mockResolvedValue(0);
+      disciplineRepositoryMock.save.mockImplementation(async (value) => value);
+
+      const result = await service.updateDiscipline(discipline.id, {
+        courseId: newCourse.id,
+      });
+
+      expect(courseRepositoryMock.findOne).toHaveBeenCalledWith({
+        where: { id: newCourse.id },
+      });
+
+      expect(result.course).toEqual(newCourse);
+    });
+
+    it('deve rejeitar a edição com código duplicado', async () => {
+      const discipline = {
+        id: 'discipline-id-1',
+        code: 'ENGSOFT',
+        name: 'Engenharia de Software',
+      };
+
+      const otherDiscipline = {
+        id: 'discipline-id-2',
+        code: 'BD',
+        name: 'Banco de Dados',
+      };
+
+      disciplineRepositoryMock.findOne
+        .mockResolvedValueOnce(discipline)
+        .mockResolvedValueOnce(otherDiscipline);
+
+      await expect(
+        service.updateDiscipline(discipline.id, {
+          code: 'BD',
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(disciplineRepositoryMock.save).not.toHaveBeenCalled();
+    });
+
+    it('deve rejeitar a edição de uma disciplina inexistente', async () => {
+      disciplineRepositoryMock.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.updateDiscipline('discipline-id-inexistente', {
+          name: 'Novo nome',
+        }),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(disciplineRepositoryMock.save).not.toHaveBeenCalled();
+    });
+
+    it('deve rejeitar vínculo com curso inexistente', async () => {
+      disciplineRepositoryMock.findOne.mockResolvedValue({
+        id: 'discipline-id-1',
+        code: 'ENGSOFT',
+        name: 'Engenharia de Software',
+      });
+
+      courseRepositoryMock.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.updateDiscipline('discipline-id-1', {
+          courseId: '550e8400-e29b-41d4-a716-446655440000',
+        }),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(disciplineRepositoryMock.save).not.toHaveBeenCalled();
+    });
+
+    it('deve rejeitar atualização de disciplina sem campos', async () => {
+      disciplineRepositoryMock.findOne.mockResolvedValue({
+        id: 'discipline-id-1',
+        code: 'ENGSOFT',
+        name: 'Engenharia de Software',
+      });
+
+      await expect(
+        service.updateDiscipline('discipline-id-1', {}),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(disciplineRepositoryMock.save).not.toHaveBeenCalled();
+    });
+
+    it('deve excluir uma disciplina sem turmas vinculadas', async () => {
+      const disciplineId = 'discipline-id-1';
+
+      disciplineRepositoryMock.findOne.mockResolvedValue({
+        id: disciplineId,
+        code: 'TESTE',
+        name: 'Disciplina de Teste',
+      });
+
+      classGroupRepositoryMock.count.mockResolvedValue(0);
+      disciplineRepositoryMock.delete.mockResolvedValue({ affected: 1 });
+
+      const result = await service.deleteDiscipline(disciplineId);
+
+      expect(classGroupRepositoryMock.count).toHaveBeenCalledWith({
+        where: {
+          discipline: { id: disciplineId },
+        },
+      });
+
+      expect(disciplineRepositoryMock.delete).toHaveBeenCalledWith(
+        disciplineId,
+      );
+
+      expect(result).toEqual({
+        message: 'Disciplina excluída com sucesso.',
+      });
+    });
+
+    it('deve impedir a exclusão de disciplina com turmas vinculadas', async () => {
+      const disciplineId = 'discipline-id-1';
+
+      disciplineRepositoryMock.findOne.mockResolvedValue({
+        id: disciplineId,
+        code: 'ENGSOFT',
+        name: 'Engenharia de Software',
+      });
+
+      classGroupRepositoryMock.count.mockResolvedValue(2);
+
+      await expect(service.deleteDiscipline(disciplineId)).rejects.toThrow(
+        ConflictException,
+      );
+
+      expect(disciplineRepositoryMock.delete).not.toHaveBeenCalled();
+    });
+
+    it('deve rejeitar a exclusão de uma disciplina inexistente', async () => {
+      disciplineRepositoryMock.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.deleteDiscipline('discipline-id-inexistente'),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(classGroupRepositoryMock.count).not.toHaveBeenCalled();
+      expect(disciplineRepositoryMock.delete).not.toHaveBeenCalled();
+    });
+
+    it('deve tratar exclusão de disciplina sem registro afetado', async () => {
+      const disciplineId = 'discipline-id-1';
+
+      disciplineRepositoryMock.findOne.mockResolvedValue({
+        id: disciplineId,
+        code: 'TESTE',
+        name: 'Disciplina de Teste',
+      });
+
+      classGroupRepositoryMock.count.mockResolvedValue(0);
+      disciplineRepositoryMock.delete.mockResolvedValue({ affected: 0 });
+
+      await expect(service.deleteDiscipline(disciplineId)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('deve tratar erro de chave estrangeira ao excluir disciplina', async () => {
+      const disciplineId = 'discipline-id-1';
+
+      disciplineRepositoryMock.findOne.mockResolvedValue({
+        id: disciplineId,
+        code: 'TESTE',
+        name: 'Disciplina de Teste',
+      });
+
+      classGroupRepositoryMock.count.mockResolvedValue(0);
+
+      const driverError = Object.assign(
+        new Error('Violação de chave estrangeira.'),
+        {
+          code: '23503',
+          detail: 'Registro referenciado por uma chave estrangeira.',
+        },
+      );
+
+      const databaseError = new QueryFailedError(
+        'DELETE FROM disciplines WHERE id = $1',
+        [disciplineId],
+        driverError,
+      );
+
+      disciplineRepositoryMock.delete.mockRejectedValue(databaseError);
+
+      await expect(service.deleteDiscipline(disciplineId)).rejects.toThrow(
+        ConflictException,
+      );
+
+      expect(disciplineRepositoryMock.delete).toHaveBeenCalledWith(
+        disciplineId,
+      );
+    });
+
+    it('deve impedir a transferência de disciplina com turmas vinculadas', async () => {
+      const discipline = {
+        id: 'discipline-id-1',
+        code: 'ENGSOFT',
+        name: 'Engenharia de Software',
+        course: { id: 'course-id-1' },
+      };
+
+      const newCourse = {
+        id: 'course-id-2',
+        code: 'SI',
+        name: 'Sistemas de Informação',
+      };
+
+      disciplineRepositoryMock.findOne.mockResolvedValue(discipline);
+      courseRepositoryMock.findOne.mockResolvedValue(newCourse);
+      classGroupRepositoryMock.count.mockResolvedValue(2);
+
+      await expect(
+        service.updateDiscipline(discipline.id, {
+          courseId: newCourse.id,
+        }),
+      ).rejects.toThrow(ConflictException);
+
+      expect(classGroupRepositoryMock.count).toHaveBeenCalledWith({
+        where: {
+          discipline: { id: discipline.id },
+        },
+      });
+
+      expect(disciplineRepositoryMock.save).not.toHaveBeenCalled();
+    });
+
+    it('deve permitir manter o mesmo curso quando existem turmas', async () => {
+      const course = {
+        id: 'course-id-1',
+        code: 'CC',
+        name: 'Ciência da Computação',
+      };
+
+      const discipline = {
+        id: 'discipline-id-1',
+        code: 'ENGSOFT',
+        name: 'Engenharia de Software',
+        course,
+      };
+
+      disciplineRepositoryMock.findOne.mockResolvedValue(discipline);
+      courseRepositoryMock.findOne.mockResolvedValue(course);
+      disciplineRepositoryMock.save.mockImplementation(async (value) => value);
+
+      const result = await service.updateDiscipline(discipline.id, {
+        name: 'Engenharia de Software I',
+        courseId: course.id,
+      });
+
+      expect(result.name).toBe('Engenharia de Software I');
+      expect(result.course.id).toBe(course.id);
+
+      expect(classGroupRepositoryMock.count).not.toHaveBeenCalled();
+      expect(disciplineRepositoryMock.save).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('Semestres', () => {
