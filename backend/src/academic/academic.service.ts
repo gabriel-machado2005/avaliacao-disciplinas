@@ -18,6 +18,8 @@ import { Discipline } from './entities/discipline.entity';
 import { UpdateCourseDto } from './dto/update-course.dto';
 import { UpdateDisciplineDto } from './dto/update-discipline.dto';
 import { UpdateAcademicTermDto } from './dto/update-academic-term.dto';
+import { Evaluation } from '../evaluations/entities/evaluation.entity';
+import { UpdateClassGroupDto } from './dto/update-class-group.dto';
 
 @Injectable()
 export class AcademicService {
@@ -36,6 +38,9 @@ export class AcademicService {
 
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+
+    @InjectRepository(Evaluation)
+    private readonly evaluationRepository: Repository<Evaluation>,
   ) {}
 
   async createCourse(dto: CreateCourseDto) {
@@ -454,6 +459,160 @@ export class AcademicService {
     });
 
     return this.classGroupRepository.save(classGroup);
+  }
+
+  async updateClassGroup(id: string, dto: UpdateClassGroupDto) {
+    const classGroup = await this.classGroupRepository.findOne({
+      where: { id },
+      relations: {
+        discipline: true,
+        professor: true,
+        academicTerm: true,
+      },
+    });
+
+    if (!classGroup) {
+      throw new NotFoundException('Turma não encontrada.');
+    }
+
+    if (
+      dto.code === undefined &&
+      dto.disciplineId === undefined &&
+      dto.professorId === undefined &&
+      dto.academicTermId === undefined
+    ) {
+      throw new BadRequestException(
+        'Informe pelo menos um campo para atualizar.',
+      );
+    }
+
+    const disciplineChanged =
+      dto.disciplineId !== undefined &&
+      dto.disciplineId !== classGroup.discipline.id;
+
+    const professorChanged =
+      dto.professorId !== undefined &&
+      dto.professorId !== classGroup.professor.id;
+
+    const academicTermChanged =
+      dto.academicTermId !== undefined &&
+      dto.academicTermId !== classGroup.academicTerm.id;
+
+    if (disciplineChanged || professorChanged || academicTermChanged) {
+      const linkedEvaluations = await this.evaluationRepository.count({
+        where: {
+          classGroup: { id },
+        },
+      });
+
+      if (linkedEvaluations > 0) {
+        throw new ConflictException(
+          'Não é possível alterar disciplina, professor ou semestre desta turma porque existem avaliações vinculadas a ela.',
+        );
+      }
+    }
+
+    if (
+      dto.disciplineId !== undefined &&
+      dto.disciplineId !== classGroup.discipline.id
+    ) {
+      const discipline = await this.disciplineRepository.findOne({
+        where: { id: dto.disciplineId },
+      });
+
+      if (!discipline) {
+        throw new NotFoundException('Disciplina não encontrada.');
+      }
+
+      classGroup.discipline = discipline;
+    }
+
+    if (
+      dto.professorId !== undefined &&
+      dto.professorId !== classGroup.professor.id
+    ) {
+      const professor = await this.userRepository.findOne({
+        where: { id: dto.professorId },
+      });
+
+      if (!professor) {
+        throw new NotFoundException('Professor não encontrado.');
+      }
+
+      if (professor.role !== UserRole.PROFESSOR || !professor.active) {
+        throw new BadRequestException(
+          'O usuário informado deve ser um professor ativo.',
+        );
+      }
+
+      classGroup.professor = professor;
+    }
+
+    if (
+      dto.academicTermId !== undefined &&
+      dto.academicTermId !== classGroup.academicTerm.id
+    ) {
+      const academicTerm = await this.academicTermRepository.findOne({
+        where: { id: dto.academicTermId },
+      });
+
+      if (!academicTerm) {
+        throw new NotFoundException('Período letivo não encontrado.');
+      }
+
+      classGroup.academicTerm = academicTerm;
+    }
+
+    if (dto.code !== undefined) {
+      classGroup.code = dto.code;
+    }
+
+    return this.classGroupRepository.save(classGroup);
+  }
+
+  async deleteClassGroup(id: string) {
+    const classGroup = await this.classGroupRepository.findOne({
+      where: { id },
+    });
+
+    if (!classGroup) {
+      throw new NotFoundException('Turma não encontrada.');
+    }
+
+    const linkedEvaluations = await this.evaluationRepository.count({
+      where: {
+        classGroup: { id },
+      },
+    });
+
+    if (linkedEvaluations > 0) {
+      throw new ConflictException(
+        'Não é possível excluir esta turma porque existem avaliações vinculadas a ela.',
+      );
+    }
+
+    try {
+      const result = await this.classGroupRepository.delete(id);
+
+      if (!result.affected) {
+        throw new NotFoundException('Turma não encontrada.');
+      }
+
+      return {
+        message: 'Turma excluída com sucesso.',
+      };
+    } catch (error) {
+      if (
+        error instanceof QueryFailedError &&
+        (error.driverError as { code?: string }).code === '23503'
+      ) {
+        throw new ConflictException(
+          'Não é possível excluir esta turma porque existem registros vinculados a ela.',
+        );
+      }
+
+      throw error;
+    }
   }
 
   findClasses() {

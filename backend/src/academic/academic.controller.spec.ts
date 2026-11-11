@@ -21,6 +21,8 @@ describe('AcademicController', () => {
     deleteAcademicTerm: jest.fn(),
     findAcademicTerms: jest.fn(),
     createClassGroup: jest.fn(),
+    updateClassGroup: jest.fn(),
+    deleteClassGroup: jest.fn(),
     findClasses: jest.fn(),
   };
 
@@ -352,6 +354,55 @@ describe('AcademicController', () => {
 
       expect(academicServiceMock.findClasses).toHaveBeenCalledTimes(1);
       expect(result).toEqual(classes);
+    });
+
+    it('deve encaminhar a edição de uma turma ao serviço', async () => {
+      const classId = '550e8400-e29b-41d4-a716-446655440000';
+
+      const dto = {
+        code: 'REDES-2027-B',
+      };
+
+      const updatedClass = {
+        id: classId,
+        code: dto.code,
+        discipline: { id: 'discipline-id-1' },
+        professor: { id: 'professor-id-1' },
+        academicTerm: { id: 'term-id-1' },
+      };
+
+      academicServiceMock.updateClassGroup.mockResolvedValue(updatedClass);
+
+      const result = await controller.updateClassGroup(classId, dto);
+
+      expect(academicServiceMock.updateClassGroup).toHaveBeenCalledWith(
+        classId,
+        dto,
+      );
+
+      expect(academicServiceMock.updateClassGroup).toHaveBeenCalledTimes(1);
+
+      expect(result).toEqual(updatedClass);
+    });
+
+    it('deve encaminhar a exclusão de uma turma ao serviço', async () => {
+      const classId = '550e8400-e29b-41d4-a716-446655440000';
+
+      const expectedResult = {
+        message: 'Turma excluída com sucesso.',
+      };
+
+      academicServiceMock.deleteClassGroup.mockResolvedValue(expectedResult);
+
+      const result = await controller.deleteClassGroup(classId);
+
+      expect(academicServiceMock.deleteClassGroup).toHaveBeenCalledWith(
+        classId,
+      );
+
+      expect(academicServiceMock.deleteClassGroup).toHaveBeenCalledTimes(1);
+
+      expect(result).toEqual(expectedResult);
     });
   });
 });

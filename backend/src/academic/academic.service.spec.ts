@@ -12,6 +12,7 @@ import { ClassGroup } from './entities/class-group.entity';
 import { Course } from './entities/course.entity';
 import { Discipline } from './entities/discipline.entity';
 import { QueryFailedError } from 'typeorm';
+import { Evaluation } from '../evaluations/entities/evaluation.entity';
 
 describe('AcademicService', () => {
   let service: AcademicService;
@@ -30,6 +31,7 @@ describe('AcademicService', () => {
   let academicTermRepositoryMock: ReturnType<typeof createRepositoryMock>;
   let classGroupRepositoryMock: ReturnType<typeof createRepositoryMock>;
   let userRepositoryMock: ReturnType<typeof createRepositoryMock>;
+  let evaluationRepositoryMock: ReturnType<typeof createRepositoryMock>;
 
   beforeEach(async () => {
     courseRepositoryMock = createRepositoryMock();
@@ -37,6 +39,7 @@ describe('AcademicService', () => {
     academicTermRepositoryMock = createRepositoryMock();
     classGroupRepositoryMock = createRepositoryMock();
     userRepositoryMock = createRepositoryMock();
+    evaluationRepositoryMock = createRepositoryMock();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -60,6 +63,10 @@ describe('AcademicService', () => {
         {
           provide: getRepositoryToken(User),
           useValue: userRepositoryMock,
+        },
+        {
+          provide: getRepositoryToken(Evaluation),
+          useValue: evaluationRepositoryMock,
         },
       ],
     }).compile();
@@ -1293,6 +1300,364 @@ describe('AcademicService', () => {
         order: {
           code: 'ASC',
         },
+      });
+    });
+
+    describe('Edição de turmas', () => {
+      function makeClassGroup() {
+        return {
+          id: 'class-id-1',
+          code: 'REDES-2027-A',
+          discipline: { id: 'discipline-id-1' },
+          professor: { id: 'professor-id-1' },
+          academicTerm: { id: 'term-id-1' },
+        };
+      }
+
+      it('deve permitir corrigir o código mesmo com avaliações vinculadas', async () => {
+        const classGroup = makeClassGroup();
+
+        classGroupRepositoryMock.findOne.mockResolvedValue(classGroup);
+        classGroupRepositoryMock.save.mockImplementation(
+          async (value) => value,
+        );
+
+        const result = await service.updateClassGroup(classGroup.id, {
+          code: 'REDES-2027-B',
+        });
+
+        expect(result.code).toBe('REDES-2027-B');
+        expect(evaluationRepositoryMock.count).not.toHaveBeenCalled();
+        expect(classGroupRepositoryMock.save).toHaveBeenCalledTimes(1);
+      });
+
+      it('deve rejeitar edição de turma inexistente', async () => {
+        classGroupRepositoryMock.findOne.mockResolvedValue(null);
+
+        await expect(
+          service.updateClassGroup('class-id-inexistente', {
+            code: 'NOVA-TURMA',
+          }),
+        ).rejects.toThrow(NotFoundException);
+
+        expect(classGroupRepositoryMock.save).not.toHaveBeenCalled();
+      });
+
+      it('deve rejeitar atualização de turma sem campos', async () => {
+        const classGroup = makeClassGroup();
+
+        classGroupRepositoryMock.findOne.mockResolvedValue(classGroup);
+
+        await expect(
+          service.updateClassGroup(classGroup.id, {}),
+        ).rejects.toThrow(BadRequestException);
+
+        expect(classGroupRepositoryMock.save).not.toHaveBeenCalled();
+      });
+
+      it('deve impedir alteração de vínculos quando existem avaliações', async () => {
+        const classGroup = makeClassGroup();
+
+        classGroupRepositoryMock.findOne.mockResolvedValue(classGroup);
+        evaluationRepositoryMock.count.mockResolvedValue(2);
+
+        await expect(
+          service.updateClassGroup(classGroup.id, {
+            disciplineId: 'discipline-id-2',
+          }),
+        ).rejects.toThrow(ConflictException);
+
+        expect(evaluationRepositoryMock.count).toHaveBeenCalledWith({
+          where: {
+            classGroup: { id: classGroup.id },
+          },
+        });
+
+        expect(classGroupRepositoryMock.save).not.toHaveBeenCalled();
+      });
+
+      it('deve permitir alterar a disciplina sem avaliações vinculadas', async () => {
+        const classGroup = makeClassGroup();
+        const newDiscipline = { id: 'discipline-id-2' };
+
+        classGroupRepositoryMock.findOne.mockResolvedValue(classGroup);
+        evaluationRepositoryMock.count.mockResolvedValue(0);
+        disciplineRepositoryMock.findOne.mockResolvedValue(newDiscipline);
+        classGroupRepositoryMock.save.mockImplementation(
+          async (value) => value,
+        );
+
+        const result = await service.updateClassGroup(classGroup.id, {
+          disciplineId: newDiscipline.id,
+        });
+
+        expect(result.discipline.id).toBe('discipline-id-2');
+        expect(evaluationRepositoryMock.count).toHaveBeenCalledTimes(1);
+        expect(classGroupRepositoryMock.save).toHaveBeenCalledTimes(1);
+      });
+
+      it('deve rejeitar professor inativo na edição da turma', async () => {
+        const classGroup = makeClassGroup();
+
+        classGroupRepositoryMock.findOne.mockResolvedValue(classGroup);
+        evaluationRepositoryMock.count.mockResolvedValue(0);
+
+        userRepositoryMock.findOne.mockResolvedValue({
+          id: 'professor-id-2',
+          role: UserRole.PROFESSOR,
+          active: false,
+        });
+
+        await expect(
+          service.updateClassGroup(classGroup.id, {
+            professorId: 'professor-id-2',
+          }),
+        ).rejects.toThrow(BadRequestException);
+
+        expect(classGroupRepositoryMock.save).not.toHaveBeenCalled();
+      });
+
+      it('deve permitir alterar para um professor ativo', async () => {
+        const classGroup = makeClassGroup();
+
+        const newProfessor = {
+          id: 'professor-id-2',
+          role: UserRole.PROFESSOR,
+          active: true,
+        };
+
+        classGroupRepositoryMock.findOne.mockResolvedValue(classGroup);
+        evaluationRepositoryMock.count.mockResolvedValue(0);
+        userRepositoryMock.findOne.mockResolvedValue(newProfessor);
+        classGroupRepositoryMock.save.mockImplementation(
+          async (value) => value,
+        );
+
+        const result = await service.updateClassGroup(classGroup.id, {
+          professorId: newProfessor.id,
+        });
+
+        expect(result.professor.id).toBe('professor-id-2');
+        expect(classGroupRepositoryMock.save).toHaveBeenCalledTimes(1);
+      });
+
+      it('deve permitir alterar o semestre sem avaliações vinculadas', async () => {
+        const classGroup = makeClassGroup();
+        const newTerm = { id: 'term-id-2', code: '2027/2' };
+
+        classGroupRepositoryMock.findOne.mockResolvedValue(classGroup);
+        evaluationRepositoryMock.count.mockResolvedValue(0);
+        academicTermRepositoryMock.findOne.mockResolvedValue(newTerm);
+        classGroupRepositoryMock.save.mockImplementation(
+          async (value) => value,
+        );
+
+        const result = await service.updateClassGroup(classGroup.id, {
+          academicTermId: newTerm.id,
+        });
+
+        expect(result.academicTerm.id).toBe('term-id-2');
+        expect(classGroupRepositoryMock.save).toHaveBeenCalledTimes(1);
+      });
+
+      it('deve rejeitar disciplina inexistente na edição', async () => {
+        const classGroup = makeClassGroup();
+
+        classGroupRepositoryMock.findOne.mockResolvedValue(classGroup);
+        evaluationRepositoryMock.count.mockResolvedValue(0);
+        disciplineRepositoryMock.findOne.mockResolvedValue(null);
+
+        await expect(
+          service.updateClassGroup(classGroup.id, {
+            disciplineId: 'discipline-id-inexistente',
+          }),
+        ).rejects.toThrow(NotFoundException);
+
+        expect(classGroupRepositoryMock.save).not.toHaveBeenCalled();
+      });
+
+      it('deve rejeitar professor inexistente na edição', async () => {
+        const classGroup = makeClassGroup();
+
+        classGroupRepositoryMock.findOne.mockResolvedValue(classGroup);
+        evaluationRepositoryMock.count.mockResolvedValue(0);
+        userRepositoryMock.findOne.mockResolvedValue(null);
+
+        await expect(
+          service.updateClassGroup(classGroup.id, {
+            professorId: 'professor-id-inexistente',
+          }),
+        ).rejects.toThrow(NotFoundException);
+
+        expect(classGroupRepositoryMock.save).not.toHaveBeenCalled();
+      });
+
+      it('deve impedir atribuir um usuário que não é professor', async () => {
+        const classGroup = makeClassGroup();
+
+        classGroupRepositoryMock.findOne.mockResolvedValue(classGroup);
+        evaluationRepositoryMock.count.mockResolvedValue(0);
+
+        userRepositoryMock.findOne.mockResolvedValue({
+          id: 'student-id-1',
+          role: UserRole.STUDENT,
+          active: true,
+        });
+
+        await expect(
+          service.updateClassGroup(classGroup.id, {
+            professorId: 'student-id-1',
+          }),
+        ).rejects.toThrow(BadRequestException);
+
+        expect(classGroupRepositoryMock.save).not.toHaveBeenCalled();
+      });
+
+      it('deve rejeitar semestre inexistente na edição', async () => {
+        const classGroup = makeClassGroup();
+
+        classGroupRepositoryMock.findOne.mockResolvedValue(classGroup);
+        evaluationRepositoryMock.count.mockResolvedValue(0);
+        academicTermRepositoryMock.findOne.mockResolvedValue(null);
+
+        await expect(
+          service.updateClassGroup(classGroup.id, {
+            academicTermId: 'term-id-inexistente',
+          }),
+        ).rejects.toThrow(NotFoundException);
+
+        expect(classGroupRepositoryMock.save).not.toHaveBeenCalled();
+      });
+
+      it('deve permitir manter os mesmos vínculos mesmo com avaliações', async () => {
+        const classGroup = makeClassGroup();
+
+        classGroupRepositoryMock.findOne.mockResolvedValue(classGroup);
+        classGroupRepositoryMock.save.mockImplementation(
+          async (value) => value,
+        );
+
+        const result = await service.updateClassGroup(classGroup.id, {
+          code: 'REDES-2027-B',
+          disciplineId: 'discipline-id-1',
+          professorId: 'professor-id-1',
+          academicTermId: 'term-id-1',
+        });
+
+        expect(result.code).toBe('REDES-2027-B');
+        expect(result.discipline.id).toBe('discipline-id-1');
+        expect(result.professor.id).toBe('professor-id-1');
+        expect(result.academicTerm.id).toBe('term-id-1');
+
+        expect(evaluationRepositoryMock.count).not.toHaveBeenCalled();
+        expect(classGroupRepositoryMock.save).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe('Exclusão de turmas', () => {
+      it('deve excluir uma turma sem avaliações vinculadas', async () => {
+        const classId = 'class-id-1';
+
+        classGroupRepositoryMock.findOne.mockResolvedValue({
+          id: classId,
+          code: 'REDES-2027-A',
+        });
+
+        evaluationRepositoryMock.count.mockResolvedValue(0);
+
+        classGroupRepositoryMock.delete.mockResolvedValue({
+          affected: 1,
+        });
+
+        const result = await service.deleteClassGroup(classId);
+
+        expect(evaluationRepositoryMock.count).toHaveBeenCalledWith({
+          where: {
+            classGroup: { id: classId },
+          },
+        });
+
+        expect(classGroupRepositoryMock.delete).toHaveBeenCalledWith(classId);
+
+        expect(result).toEqual({
+          message: 'Turma excluída com sucesso.',
+        });
+      });
+
+      it('deve impedir exclusão de turma com avaliações vinculadas', async () => {
+        const classId = 'class-id-1';
+
+        classGroupRepositoryMock.findOne.mockResolvedValue({
+          id: classId,
+          code: 'REDES-2027-A',
+        });
+
+        evaluationRepositoryMock.count.mockResolvedValue(2);
+
+        await expect(service.deleteClassGroup(classId)).rejects.toThrow(
+          ConflictException,
+        );
+
+        expect(classGroupRepositoryMock.delete).not.toHaveBeenCalled();
+      });
+
+      it('deve rejeitar exclusão de turma inexistente', async () => {
+        classGroupRepositoryMock.findOne.mockResolvedValue(null);
+
+        await expect(
+          service.deleteClassGroup('class-id-inexistente'),
+        ).rejects.toThrow(NotFoundException);
+
+        expect(evaluationRepositoryMock.count).not.toHaveBeenCalled();
+        expect(classGroupRepositoryMock.delete).not.toHaveBeenCalled();
+      });
+
+      it('deve tratar exclusão de turma sem registro afetado', async () => {
+        const classId = 'class-id-1';
+
+        classGroupRepositoryMock.findOne.mockResolvedValue({
+          id: classId,
+          code: 'REDES-2027-A',
+        });
+
+        evaluationRepositoryMock.count.mockResolvedValue(0);
+
+        classGroupRepositoryMock.delete.mockResolvedValue({
+          affected: 0,
+        });
+
+        await expect(service.deleteClassGroup(classId)).rejects.toThrow(
+          NotFoundException,
+        );
+
+        expect(classGroupRepositoryMock.delete).toHaveBeenCalledWith(classId);
+      });
+
+      it('deve tratar erro de chave estrangeira ao excluir turma', async () => {
+        const classId = 'class-id-1';
+
+        classGroupRepositoryMock.findOne.mockResolvedValue({
+          id: classId,
+          code: 'REDES-2027-A',
+        });
+
+        evaluationRepositoryMock.count.mockResolvedValue(0);
+
+        classGroupRepositoryMock.delete.mockRejectedValue(
+          new QueryFailedError(
+            'DELETE FROM classes WHERE id = $1',
+            [classId],
+            Object.assign(new Error('Violação de chave estrangeira'), {
+              code: '23503',
+            }),
+          ),
+        );
+
+        await expect(service.deleteClassGroup(classId)).rejects.toThrow(
+          ConflictException,
+        );
+
+        expect(classGroupRepositoryMock.delete).toHaveBeenCalledWith(classId);
       });
     });
   });

@@ -8,6 +8,7 @@ import { AcademicTerm } from './entities/academic-term.entity';
 import { ClassGroup } from './entities/class-group.entity';
 import { Course } from './entities/course.entity';
 import { Discipline } from './entities/discipline.entity';
+import { Evaluation } from '../evaluations/entities/evaluation.entity';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { Discipline } from './entities/discipline.entity';
       AcademicTerm,
       ClassGroup,
       User,
+      Evaluation,
     ]),
 
     PassportModule.register({

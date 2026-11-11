@@ -13,6 +13,7 @@ describe('RolesGuard - permissões acadêmicas', () => {
       | 'deleteCourse'
       | 'deleteDiscipline'
       | 'deleteAcademicTerm'
+      | 'deleteClassGroup'
       | 'findCourses',
     role: UserRole,
   ): ExecutionContext {
@@ -71,6 +72,18 @@ describe('RolesGuard - permissões acadêmicas', () => {
 
   it('deve impedir que um coordenador exclua períodos letivos', () => {
     const context = createContext('deleteAcademicTerm', UserRole.COORDINATOR);
+
+    expect(guard.canActivate(context)).toBe(false);
+  });
+
+  it('deve permitir que um administrador exclua turmas', () => {
+    const context = createContext('deleteClassGroup', UserRole.ADMIN);
+
+    expect(guard.canActivate(context)).toBe(true);
+  });
+
+  it('deve impedir que um coordenador exclua turmas', () => {
+    const context = createContext('deleteClassGroup', UserRole.COORDINATOR);
 
     expect(guard.canActivate(context)).toBe(false);
   });
