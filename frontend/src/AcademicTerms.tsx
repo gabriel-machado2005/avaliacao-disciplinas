@@ -8,22 +8,34 @@ type AcademicTerm = {
   active: boolean;
 };
 
+type AcademicTermsProps = {
+  role: "ADMIN" | "COORDINATOR";
+};
+
 function formatDate(date: string) {
   const [year, month, day] = date.slice(0, 10).split("-");
   return `${day}/${month}/${year}`;
 }
 
-export default function AcademicTerms() {
+function sortTerms(terms: AcademicTerm[]) {
+  return [...terms].sort((a, b) => b.startDate.localeCompare(a.startDate));
+}
+
+export default function AcademicTerms({ role }: AcademicTermsProps) {
   const [terms, setTerms] = useState<AcademicTerm[]>([]);
 
   const [code, setCode] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
+  const [editingTermId, setEditingTermId] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingTermId, setDeletingTermId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const canDeleteTerms = role === "ADMIN";
 
   useEffect(() => {
     const controller = new AbortController();
@@ -50,7 +62,7 @@ export default function AcademicTerms() {
         const data: AcademicTerm[] = await response.json();
 
         if (!controller.signal.aborted) {
-          setTerms(data);
+          setTerms(sortTerms(data));
         }
       } catch (err) {
         if (!controller.signal.aborted) {
@@ -70,18 +82,110 @@ export default function AcademicTerms() {
     return () => controller.abort();
   }, []);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function clearForm() {
+    setCode("");
+    setStartDate("");
+    setEndDate("");
+    setEditingTermId(null);
+  }
 
+  function handleEdit(term: AcademicTerm) {
     if (saving) return;
+
+    setEditingTermId(term.id);
+    setCode(term.code);
+    setStartDate(term.startDate.slice(0, 10));
+    setEndDate(term.endDate.slice(0, 10));
 
     setError("");
     setSuccess("");
 
-    if (endDate <= startDate) {
+    document.getElementById("term-code")?.focus();
+  }
+
+  function handleCancelEdit() {
+    if (saving) return;
+
+    clearForm();
+    setError("");
+    setSuccess("");
+  }
+
+  async function handleDelete(term: AcademicTerm) {
+    if (!canDeleteTerms || saving || deletingTermId !== null) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Deseja realmente excluir o semestre "${term.code}"?\n\n` +
+        "Esta operação não poderá ser desfeita.",
+    );
+
+    if (!confirmed) return;
+
+    setError("");
+    setSuccess("");
+    setDeletingTermId(term.id);
+
+    try {
+      const token = sessionStorage.getItem("accessToken");
+
+      if (!token) {
+        throw new Error("Faça login novamente para continuar.");
+      }
+
+      const response = await fetch(
+        `http://localhost:3000/academic/terms/${term.id}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      if (!response.ok) {
+        const data: { message?: string | string[] } = await response
+          .json()
+          .catch(() => ({}));
+
+        const message = Array.isArray(data.message)
+          ? data.message.join(" ")
+          : data.message;
+
+        throw new Error(message || "Não foi possível excluir o semestre.");
+      }
+
+      setTerms((previous) => previous.filter((item) => item.id !== term.id));
+
+      if (editingTermId === term.id) {
+        clearForm();
+      }
+
+      setSuccess("Semestre letivo excluído com sucesso!");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Erro ao excluir semestre.",
+      );
+    } finally {
+      setDeletingTermId(null);
+    }
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (saving || deletingTermId !== null) return;
+
+    setError("");
+    setSuccess("");
+
+    if (!startDate || !endDate || endDate <= startDate) {
       setError("A data de encerramento deve ser posterior à data de início.");
       return;
     }
+
+    const isEditing = editingTermId !== null;
 
     setSaving(true);
 
@@ -92,8 +196,12 @@ export default function AcademicTerms() {
         throw new Error("Faça login novamente para continuar.");
       }
 
-      const response = await fetch("http://localhost:3000/academic/terms", {
-        method: "POST",
+      const url = isEditing
+        ? `http://localhost:3000/academic/terms/${editingTermId}`
+        : "http://localhost:3000/academic/terms";
+
+      const response = await fetch(url, {
+        method: isEditing ? "PATCH" : "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -114,22 +222,37 @@ export default function AcademicTerms() {
           ? data.message.join(" ")
           : data.message;
 
-        throw new Error(message || "Não foi possível cadastrar o semestre.");
+        throw new Error(
+          message ||
+            (isEditing
+              ? "Não foi possível atualizar o semestre."
+              : "Não foi possível cadastrar o semestre."),
+        );
       }
 
-      const createdTerm: AcademicTerm = await response.json();
+      const savedTerm: AcademicTerm = await response.json();
 
-      setTerms((previous) => [...previous, createdTerm]);
+      setTerms((previous) => {
+        if (isEditing) {
+          return sortTerms(
+            previous.map((term) =>
+              term.id === savedTerm.id ? savedTerm : term,
+            ),
+          );
+        }
 
-      setCode("");
-      setStartDate("");
-      setEndDate("");
+        return sortTerms([...previous, savedTerm]);
+      });
 
-      setSuccess("Semestre letivo cadastrado com sucesso!");
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Erro ao cadastrar semestre.",
+      clearForm();
+
+      setSuccess(
+        isEditing
+          ? "Semestre letivo atualizado com sucesso!"
+          : "Semestre letivo cadastrado com sucesso!",
       );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao salvar semestre.");
     } finally {
       setSaving(false);
     }
@@ -144,7 +267,9 @@ export default function AcademicTerms() {
         className="evaluation-card"
         style={{ display: "grid", gap: "12px" }}
       >
-        <h3>Cadastrar novo semestre</h3>
+        <h3>
+          {editingTermId ? "Editar semestre letivo" : "Cadastrar novo semestre"}
+        </h3>
 
         <label htmlFor="term-code">Código do semestre</label>
         <input
@@ -180,8 +305,18 @@ export default function AcademicTerms() {
         />
 
         <button type="submit" disabled={saving || loading}>
-          {saving ? "Cadastrando..." : "Cadastrar semestre"}
+          {saving
+            ? "Salvando..."
+            : editingTermId
+              ? "Salvar alterações"
+              : "Cadastrar semestre"}
         </button>
+
+        {editingTermId && (
+          <button type="button" onClick={handleCancelEdit} disabled={saving}>
+            Cancelar edição
+          </button>
+        )}
       </form>
 
       {error && (
@@ -211,6 +346,54 @@ export default function AcademicTerms() {
               <p>Início: {formatDate(term.startDate)}</p>
               <p>Encerramento: {formatDate(term.endDate)}</p>
               <p>Situação: {term.active ? "Ativo" : "Inativo"}</p>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: canDeleteTerms
+                    ? "repeat(2, minmax(0, 1fr))"
+                    : "1fr",
+                  gap: "16px",
+                  width: "100%",
+                  marginTop: "16px",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => handleEdit(term)}
+                  disabled={saving || deletingTermId !== null}
+                  style={{
+                    backgroundColor: "#2563eb",
+                    color: "#ffffff",
+                    border: "1px solid #2563eb",
+                    borderRadius: "12px",
+                    padding: "12px 16px",
+                    fontSize: "18px",
+                    fontWeight: 700,
+                  }}
+                >
+                  Editar
+                </button>
+
+                {canDeleteTerms && (
+                  <button
+                    type="button"
+                    onClick={() => void handleDelete(term)}
+                    disabled={saving || deletingTermId !== null}
+                    style={{
+                      backgroundColor: "#fff1f2",
+                      color: "#be123c",
+                      border: "1px solid #fecaca",
+                      borderRadius: "12px",
+                      padding: "12px 16px",
+                      fontSize: "18px",
+                      fontWeight: 700,
+                    }}
+                  >
+                    {deletingTermId === term.id ? "Excluindo..." : "Excluir"}
+                  </button>
+                )}
+              </div>
             </li>
           ))}
         </ul>

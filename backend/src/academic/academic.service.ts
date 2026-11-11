@@ -17,6 +17,7 @@ import { Course } from './entities/course.entity';
 import { Discipline } from './entities/discipline.entity';
 import { UpdateCourseDto } from './dto/update-course.dto';
 import { UpdateDisciplineDto } from './dto/update-discipline.dto';
+import { UpdateAcademicTermDto } from './dto/update-academic-term.dto';
 
 @Injectable()
 export class AcademicService {
@@ -297,6 +298,113 @@ export class AcademicService {
     return this.academicTermRepository.save(
       this.academicTermRepository.create(dto),
     );
+  }
+
+  async updateAcademicTerm(id: string, dto: UpdateAcademicTermDto) {
+    const academicTerm = await this.academicTermRepository.findOne({
+      where: { id },
+    });
+
+    if (!academicTerm) {
+      throw new NotFoundException('Período letivo não encontrado.');
+    }
+
+    if (
+      dto.code === undefined &&
+      dto.startDate === undefined &&
+      dto.endDate === undefined
+    ) {
+      throw new BadRequestException(
+        'Informe pelo menos um campo para atualizar.',
+      );
+    }
+
+    const startDate = dto.startDate ?? academicTerm.startDate;
+    const endDate = dto.endDate ?? academicTerm.endDate;
+
+    if (new Date(endDate) <= new Date(startDate)) {
+      throw new BadRequestException(
+        'A data final deve ser posterior à data inicial.',
+      );
+    }
+
+    if (dto.code !== undefined && dto.code !== academicTerm.code) {
+      const existing = await this.academicTermRepository.findOne({
+        where: { code: dto.code },
+      });
+
+      if (existing && existing.id !== id) {
+        throw new BadRequestException('Período letivo já cadastrado.');
+      }
+    }
+
+    const datesChanged =
+      startDate !== academicTerm.startDate || endDate !== academicTerm.endDate;
+
+    if (datesChanged) {
+      const linkedClasses = await this.classGroupRepository.count({
+        where: {
+          academicTerm: { id },
+        },
+      });
+
+      if (linkedClasses > 0) {
+        throw new ConflictException(
+          'Não é possível alterar as datas deste período letivo porque existem turmas vinculadas a ele.',
+        );
+      }
+    }
+
+    academicTerm.code = dto.code ?? academicTerm.code;
+    academicTerm.startDate = startDate;
+    academicTerm.endDate = endDate;
+
+    return this.academicTermRepository.save(academicTerm);
+  }
+
+  async deleteAcademicTerm(id: string) {
+    const academicTerm = await this.academicTermRepository.findOne({
+      where: { id },
+    });
+
+    if (!academicTerm) {
+      throw new NotFoundException('Período letivo não encontrado.');
+    }
+
+    const linkedClasses = await this.classGroupRepository.count({
+      where: {
+        academicTerm: { id },
+      },
+    });
+
+    if (linkedClasses > 0) {
+      throw new ConflictException(
+        'Não é possível excluir este período letivo porque existem turmas vinculadas a ele.',
+      );
+    }
+
+    try {
+      const result = await this.academicTermRepository.delete(id);
+
+      if (!result.affected) {
+        throw new NotFoundException('Período letivo não encontrado.');
+      }
+
+      return {
+        message: 'Período letivo excluído com sucesso.',
+      };
+    } catch (error) {
+      if (
+        error instanceof QueryFailedError &&
+        (error.driverError as { code?: string }).code === '23503'
+      ) {
+        throw new ConflictException(
+          'Não é possível excluir este período letivo porque existem registros vinculados a ele.',
+        );
+      }
+
+      throw error;
+    }
   }
 
   findAcademicTerms() {

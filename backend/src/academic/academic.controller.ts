@@ -20,6 +20,7 @@ import { CreateCourseDto } from './dto/create-course.dto';
 import { CreateDisciplineDto } from './dto/create-discipline.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
 import { UpdateDisciplineDto } from './dto/update-discipline.dto';
+import { UpdateAcademicTermDto } from './dto/update-academic-term.dto';
 
 @Controller('academic')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -78,6 +79,20 @@ export class AcademicController {
   @Post('terms')
   createAcademicTerm(@Body() dto: CreateAcademicTermDto) {
     return this.academicService.createAcademicTerm(dto);
+  }
+
+  @Patch('terms/:id')
+  updateAcademicTerm(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateAcademicTermDto,
+  ) {
+    return this.academicService.updateAcademicTerm(id, dto);
+  }
+
+  @Delete('terms/:id')
+  @Roles(UserRole.ADMIN)
+  deleteAcademicTerm(@Param('id', ParseUUIDPipe) id: string) {
+    return this.academicService.deleteAcademicTerm(id);
   }
 
   @Get('terms')

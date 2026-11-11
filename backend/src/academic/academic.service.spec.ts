@@ -855,6 +855,284 @@ describe('AcademicService', () => {
         },
       });
     });
+
+    it('deve atualizar o código de um período letivo', async () => {
+      const term = {
+        id: 'term-id-1',
+        code: '2027/1',
+        startDate: '2027-03-01',
+        endDate: '2027-07-31',
+      };
+
+      academicTermRepositoryMock.findOne
+        .mockResolvedValueOnce(term)
+        .mockResolvedValueOnce(null);
+
+      academicTermRepositoryMock.save.mockImplementation(
+        async (value) => value,
+      );
+
+      const result = await service.updateAcademicTerm(term.id, {
+        code: '2027-A',
+      });
+
+      expect(result.code).toBe('2027-A');
+      expect(result.startDate).toBe('2027-03-01');
+      expect(result.endDate).toBe('2027-07-31');
+      expect(academicTermRepositoryMock.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('deve atualizar a data final quando não existem turmas', async () => {
+      const term = {
+        id: 'term-id-1',
+        code: '2027/1',
+        startDate: '2027-03-01',
+        endDate: '2027-07-31',
+      };
+
+      academicTermRepositoryMock.findOne.mockResolvedValue(term);
+      classGroupRepositoryMock.count.mockResolvedValue(0);
+      academicTermRepositoryMock.save.mockImplementation(
+        async (value) => value,
+      );
+
+      const result = await service.updateAcademicTerm(term.id, {
+        endDate: '2027-08-15',
+      });
+
+      expect(classGroupRepositoryMock.count).toHaveBeenCalledWith({
+        where: {
+          academicTerm: { id: term.id },
+        },
+      });
+
+      expect(result.endDate).toBe('2027-08-15');
+      expect(result.startDate).toBe('2027-03-01');
+    });
+
+    it('deve rejeitar código de período letivo duplicado', async () => {
+      const term = {
+        id: 'term-id-1',
+        code: '2027/1',
+        startDate: '2027-03-01',
+        endDate: '2027-07-31',
+      };
+
+      const otherTerm = {
+        id: 'term-id-2',
+        code: '2027/2',
+      };
+
+      academicTermRepositoryMock.findOne
+        .mockResolvedValueOnce(term)
+        .mockResolvedValueOnce(otherTerm);
+
+      await expect(
+        service.updateAcademicTerm(term.id, {
+          code: '2027/2',
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(academicTermRepositoryMock.save).not.toHaveBeenCalled();
+    });
+
+    it('deve rejeitar atualização com datas inválidas', async () => {
+      const term = {
+        id: 'term-id-1',
+        code: '2027/1',
+        startDate: '2027-03-01',
+        endDate: '2027-07-31',
+      };
+
+      academicTermRepositoryMock.findOne.mockResolvedValue(term);
+
+      await expect(
+        service.updateAcademicTerm(term.id, {
+          endDate: '2027-02-28',
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(academicTermRepositoryMock.save).not.toHaveBeenCalled();
+    });
+
+    it('deve impedir alteração de datas quando existem turmas', async () => {
+      const term = {
+        id: 'term-id-1',
+        code: '2027/1',
+        startDate: '2027-03-01',
+        endDate: '2027-07-31',
+      };
+
+      academicTermRepositoryMock.findOne.mockResolvedValue(term);
+      classGroupRepositoryMock.count.mockResolvedValue(2);
+
+      await expect(
+        service.updateAcademicTerm(term.id, {
+          endDate: '2027-08-15',
+        }),
+      ).rejects.toThrow(ConflictException);
+
+      expect(classGroupRepositoryMock.count).toHaveBeenCalledWith({
+        where: {
+          academicTerm: { id: term.id },
+        },
+      });
+
+      expect(academicTermRepositoryMock.save).not.toHaveBeenCalled();
+    });
+
+    it('deve permitir alterar o código mesmo com turmas vinculadas', async () => {
+      const term = {
+        id: 'term-id-1',
+        code: '2027/1',
+        startDate: '2027-03-01',
+        endDate: '2027-07-31',
+      };
+
+      academicTermRepositoryMock.findOne
+        .mockResolvedValueOnce(term)
+        .mockResolvedValueOnce(null);
+
+      academicTermRepositoryMock.save.mockImplementation(
+        async (value) => value,
+      );
+
+      const result = await service.updateAcademicTerm(term.id, {
+        code: '2027-A',
+      });
+
+      expect(result.code).toBe('2027-A');
+      expect(classGroupRepositoryMock.count).not.toHaveBeenCalled();
+      expect(academicTermRepositoryMock.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('deve rejeitar edição de período letivo inexistente', async () => {
+      academicTermRepositoryMock.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.updateAcademicTerm('term-id-inexistente', {
+          code: '2027/1',
+        }),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(academicTermRepositoryMock.save).not.toHaveBeenCalled();
+    });
+
+    it('deve rejeitar atualização de período letivo sem campos', async () => {
+      academicTermRepositoryMock.findOne.mockResolvedValue({
+        id: 'term-id-1',
+        code: '2027/1',
+        startDate: '2027-03-01',
+        endDate: '2027-07-31',
+      });
+
+      await expect(service.updateAcademicTerm('term-id-1', {})).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(academicTermRepositoryMock.save).not.toHaveBeenCalled();
+    });
+
+    it('deve excluir um período letivo sem turmas vinculadas', async () => {
+      const termId = 'term-id-1';
+
+      academicTermRepositoryMock.findOne.mockResolvedValue({
+        id: termId,
+        code: 'TESTE-2028-B',
+      });
+
+      classGroupRepositoryMock.count.mockResolvedValue(0);
+
+      academicTermRepositoryMock.delete.mockResolvedValue({
+        affected: 1,
+      });
+
+      const result = await service.deleteAcademicTerm(termId);
+
+      expect(classGroupRepositoryMock.count).toHaveBeenCalledWith({
+        where: {
+          academicTerm: { id: termId },
+        },
+      });
+
+      expect(academicTermRepositoryMock.delete).toHaveBeenCalledWith(termId);
+
+      expect(result).toEqual({
+        message: 'Período letivo excluído com sucesso.',
+      });
+    });
+
+    it('deve impedir exclusão de período letivo com turmas', async () => {
+      const termId = 'term-id-1';
+
+      academicTermRepositoryMock.findOne.mockResolvedValue({
+        id: termId,
+        code: '2027/1',
+      });
+
+      classGroupRepositoryMock.count.mockResolvedValue(2);
+
+      await expect(service.deleteAcademicTerm(termId)).rejects.toThrow(
+        ConflictException,
+      );
+
+      expect(academicTermRepositoryMock.delete).not.toHaveBeenCalled();
+    });
+
+    it('deve rejeitar exclusão de período letivo inexistente', async () => {
+      academicTermRepositoryMock.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.deleteAcademicTerm('term-id-inexistente'),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(classGroupRepositoryMock.count).not.toHaveBeenCalled();
+      expect(academicTermRepositoryMock.delete).not.toHaveBeenCalled();
+    });
+
+    it('deve tratar exclusão de período letivo sem registro afetado', async () => {
+      const termId = 'term-id-1';
+
+      academicTermRepositoryMock.findOne.mockResolvedValue({
+        id: termId,
+        code: '2027/1',
+      });
+
+      classGroupRepositoryMock.count.mockResolvedValue(0);
+
+      academicTermRepositoryMock.delete.mockResolvedValue({
+        affected: 0,
+      });
+
+      await expect(service.deleteAcademicTerm(termId)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('deve tratar erro de chave estrangeira ao excluir período letivo', async () => {
+      const termId = 'term-id-1';
+
+      academicTermRepositoryMock.findOne.mockResolvedValue({
+        id: termId,
+        code: '2027/1',
+      });
+
+      classGroupRepositoryMock.count.mockResolvedValue(0);
+
+      academicTermRepositoryMock.delete.mockRejectedValue(
+        new QueryFailedError(
+          'DELETE FROM academic_terms WHERE id = $1',
+          [termId],
+          Object.assign(new Error('Violação de chave estrangeira'), {
+            code: '23503',
+          }),
+        ),
+      );
+
+      await expect(service.deleteAcademicTerm(termId)).rejects.toThrow(
+        ConflictException,
+      );
+    });
   });
 
   describe('Turmas', () => {

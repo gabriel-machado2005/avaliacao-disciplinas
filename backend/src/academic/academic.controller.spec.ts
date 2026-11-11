@@ -17,6 +17,8 @@ describe('AcademicController', () => {
     deleteDiscipline: jest.fn(),
     findDisciplines: jest.fn(),
     createAcademicTerm: jest.fn(),
+    updateAcademicTerm: jest.fn(),
+    deleteAcademicTerm: jest.fn(),
     findAcademicTerms: jest.fn(),
     createClassGroup: jest.fn(),
     findClasses: jest.fn(),
@@ -261,6 +263,55 @@ describe('AcademicController', () => {
 
       expect(academicServiceMock.findAcademicTerms).toHaveBeenCalledTimes(1);
       expect(result).toEqual(terms);
+    });
+
+    it('deve encaminhar a edição de um período letivo ao serviço', async () => {
+      const termId = '550e8400-e29b-41d4-a716-446655440000';
+
+      const dto = {
+        code: '2027-A',
+        endDate: '2027-08-15',
+      };
+
+      const updatedTerm = {
+        id: termId,
+        code: dto.code,
+        startDate: '2027-03-01',
+        endDate: dto.endDate,
+      };
+
+      academicServiceMock.updateAcademicTerm.mockResolvedValue(updatedTerm);
+
+      const result = await controller.updateAcademicTerm(termId, dto);
+
+      expect(academicServiceMock.updateAcademicTerm).toHaveBeenCalledWith(
+        termId,
+        dto,
+      );
+
+      expect(academicServiceMock.updateAcademicTerm).toHaveBeenCalledTimes(1);
+
+      expect(result).toEqual(updatedTerm);
+    });
+
+    it('deve encaminhar a exclusão de um período letivo ao serviço', async () => {
+      const termId = '550e8400-e29b-41d4-a716-446655440000';
+
+      const expectedResult = {
+        message: 'Período letivo excluído com sucesso.',
+      };
+
+      academicServiceMock.deleteAcademicTerm.mockResolvedValue(expectedResult);
+
+      const result = await controller.deleteAcademicTerm(termId);
+
+      expect(academicServiceMock.deleteAcademicTerm).toHaveBeenCalledWith(
+        termId,
+      );
+
+      expect(academicServiceMock.deleteAcademicTerm).toHaveBeenCalledTimes(1);
+
+      expect(result).toEqual(expectedResult);
     });
   });
 
