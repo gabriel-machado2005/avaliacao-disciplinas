@@ -118,7 +118,7 @@ export default function AdministrativePanel({ role }: Props) {
       ) : activeSection === "classes" ? (
         <AcademicClasses role={role} />
       ) : activeSection === "periods" ? (
-        <EvaluationPeriods />
+        <EvaluationPeriods role={role} />
       ) : activeSection === "eligibilities" ? (
         <EvaluationEligibilities />
       ) : (

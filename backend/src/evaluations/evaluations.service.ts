@@ -1,11 +1,12 @@
 import {
   BadRequestException,
   ForbiddenException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, QueryFailedError, Repository } from 'typeorm';
 import { ClassGroup } from '../academic/entities/class-group.entity';
 import { Questionnaire } from '../questionnaires/entities/questionnaire.entity';
 import { CreateEvaluationDto } from './dto/create-evaluation.dto';
@@ -20,6 +21,7 @@ import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { Answer } from './entities/answer.entity';
 import { Submission } from './entities/submission.entity';
 import { UpdateEvaluationSettingsDto } from './dto/update-evaluation-settings.dto';
+import { UpdateEvaluationPeriodDto } from './dto/update-evaluation-period.dto';
 
 @Injectable()
 export class EvaluationsService {
@@ -61,6 +63,121 @@ export class EvaluationsService {
     });
 
     return this.evaluationPeriodRepository.save(period);
+  }
+
+  async updatePeriod(id: string, dto: UpdateEvaluationPeriodDto) {
+    const period = await this.evaluationPeriodRepository.findOne({
+      where: { id },
+    });
+
+    if (!period) {
+      throw new NotFoundException('Período de avaliação não encontrado.');
+    }
+
+    if (
+      dto.name === undefined &&
+      dto.startDate === undefined &&
+      dto.endDate === undefined
+    ) {
+      throw new BadRequestException(
+        'Informe pelo menos um campo para atualizar.',
+      );
+    }
+
+    const startDate =
+      dto.startDate !== undefined
+        ? new Date(dto.startDate)
+        : new Date(period.startDate);
+
+    const endDate =
+      dto.endDate !== undefined
+        ? new Date(dto.endDate)
+        : new Date(period.endDate);
+
+    if (
+      !Number.isFinite(startDate.getTime()) ||
+      !Number.isFinite(endDate.getTime())
+    ) {
+      throw new BadRequestException('Informe datas e horários válidos.');
+    }
+
+    if (endDate <= startDate) {
+      throw new BadRequestException(
+        'A data final deve ser posterior à data inicial.',
+      );
+    }
+
+    const datesChanged =
+      startDate.getTime() !== new Date(period.startDate).getTime() ||
+      endDate.getTime() !== new Date(period.endDate).getTime();
+
+    if (datesChanged) {
+      const linkedEvaluations = await this.evaluationRepository.count({
+        where: {
+          evaluationPeriod: { id },
+        },
+      });
+
+      if (linkedEvaluations > 0) {
+        throw new ConflictException(
+          'Não é possível alterar as datas deste período porque existem avaliações vinculadas a ele.',
+        );
+      }
+    }
+
+    if (dto.name !== undefined) {
+      period.name = dto.name;
+    }
+
+    period.startDate = startDate;
+    period.endDate = endDate;
+
+    return this.evaluationPeriodRepository.save(period);
+  }
+
+  async deletePeriod(id: string) {
+    const period = await this.evaluationPeriodRepository.findOne({
+      where: { id },
+    });
+
+    if (!period) {
+      throw new NotFoundException('Período de avaliação não encontrado.');
+    }
+
+    const linkedEvaluations = await this.evaluationRepository.count({
+      where: {
+        evaluationPeriod: { id },
+      },
+    });
+
+    if (linkedEvaluations > 0) {
+      throw new ConflictException(
+        'Não é possível excluir este período porque existem avaliações vinculadas a ele.',
+      );
+    }
+
+    try {
+      const result = await this.evaluationPeriodRepository.delete(id);
+
+      if (!result.affected) {
+        throw new NotFoundException('Período de avaliação não encontrado.');
+      }
+
+      return {
+        message: 'Período de avaliação excluído com sucesso.',
+      };
+    } catch (error) {
+      if (
+        error instanceof QueryFailedError &&
+        (error.driverError as { code?: string }).code === '23503'
+      ) {
+        throw new ConflictException(
+          'Não é possível excluir este período porque existem registros vinculados a ele.',
+        );
+      }
+
+      throw error;
+    }
   }
 
   findPeriods() {

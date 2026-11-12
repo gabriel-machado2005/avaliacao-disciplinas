@@ -1,6 +1,7 @@
 import type { ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AcademicController } from '../academic/academic.controller';
+import { EvaluationsController } from '../evaluations/evaluations.controller';
 import { UserRole } from '../users/entities/user.entity';
 import { RolesGuard } from './roles.guard';
 
@@ -20,6 +21,21 @@ describe('RolesGuard - permissões acadêmicas', () => {
     return {
       getHandler: () => AcademicController.prototype[method],
       getClass: () => AcademicController,
+      switchToHttp: () => ({
+        getRequest: () => ({
+          user: { role },
+        }),
+      }),
+    } as unknown as ExecutionContext;
+  }
+
+  function createEvaluationContext(
+    method: 'deletePeriod' | 'findPeriods',
+    role: UserRole,
+  ): ExecutionContext {
+    return {
+      getHandler: () => EvaluationsController.prototype[method],
+      getClass: () => EvaluationsController,
       switchToHttp: () => ({
         getRequest: () => ({
           user: { role },
@@ -84,6 +100,36 @@ describe('RolesGuard - permissões acadêmicas', () => {
 
   it('deve impedir que um coordenador exclua turmas', () => {
     const context = createContext('deleteClassGroup', UserRole.COORDINATOR);
+
+    expect(guard.canActivate(context)).toBe(false);
+  });
+
+  it('deve permitir que um administrador exclua períodos de avaliação', () => {
+    const context = createEvaluationContext('deletePeriod', UserRole.ADMIN);
+
+    expect(guard.canActivate(context)).toBe(true);
+  });
+
+  it('deve impedir que um coordenador exclua períodos de avaliação', () => {
+    const context = createEvaluationContext(
+      'deletePeriod',
+      UserRole.COORDINATOR,
+    );
+
+    expect(guard.canActivate(context)).toBe(false);
+  });
+
+  it('deve permitir que um coordenador consulte períodos de avaliação', () => {
+    const context = createEvaluationContext(
+      'findPeriods',
+      UserRole.COORDINATOR,
+    );
+
+    expect(guard.canActivate(context)).toBe(true);
+  });
+
+  it('deve impedir que um estudante consulte períodos pelo módulo administrativo', () => {
+    const context = createEvaluationContext('findPeriods', UserRole.STUDENT);
 
     expect(guard.canActivate(context)).toBe(false);
   });

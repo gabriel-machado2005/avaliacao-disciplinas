@@ -10,6 +10,8 @@ describe('EvaluationsController', () => {
 
   const evaluationsServiceMock = {
     createPeriod: jest.fn(),
+    updatePeriod: jest.fn(),
+    deletePeriod: jest.fn(),
     findPeriods: jest.fn(),
     createEvaluation: jest.fn(),
     findEvaluations: jest.fn(),
@@ -74,6 +76,65 @@ describe('EvaluationsController', () => {
       expect(evaluationsServiceMock.createPeriod).toHaveBeenCalledTimes(1);
 
       expect(result).toEqual(period);
+    });
+
+    it('deve encaminhar a edição de um período de avaliação ao serviço', async () => {
+      const periodId = '550e8400-e29b-41d4-a716-446655440000';
+
+      const dto = {
+        name: 'Avaliação de Disciplinas 2027/1 - Revisada',
+        endDate: '2027-04-15T23:59:59.000Z',
+      };
+
+      const updatedPeriod = {
+        id: periodId,
+        name: dto.name,
+        startDate: '2027-03-01T00:00:00.000Z',
+        endDate: dto.endDate,
+        active: true,
+      };
+
+      evaluationsServiceMock.updatePeriod.mockResolvedValue(updatedPeriod);
+
+      const result = await controller.updatePeriod(periodId, dto);
+
+      expect(evaluationsServiceMock.updatePeriod).toHaveBeenCalledWith(
+        periodId,
+        dto,
+      );
+
+      expect(evaluationsServiceMock.updatePeriod).toHaveBeenCalledTimes(1);
+
+      expect(result).toEqual(updatedPeriod);
+    });
+
+    it('deve encaminhar a exclusão de um período de avaliação ao serviço', async () => {
+      const periodId = '550e8400-e29b-41d4-a716-446655440000';
+
+      const response = {
+        message: 'Período de avaliação excluído com sucesso.',
+      };
+
+      evaluationsServiceMock.deletePeriod.mockResolvedValue(response);
+
+      const result = await controller.deletePeriod(periodId);
+
+      expect(evaluationsServiceMock.deletePeriod).toHaveBeenCalledWith(
+        periodId,
+      );
+
+      expect(evaluationsServiceMock.deletePeriod).toHaveBeenCalledTimes(1);
+
+      expect(result).toEqual(response);
+    });
+
+    it('deve restringir a rota de exclusão de períodos ao administrador', () => {
+      const roles = Reflect.getMetadata(
+        'roles',
+        EvaluationsController.prototype.deletePeriod,
+      );
+
+      expect(roles).toEqual([UserRole.ADMIN]);
     });
 
     it('deve retornar a lista de períodos de avaliação', async () => {

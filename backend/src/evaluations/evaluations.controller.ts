@@ -1,8 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Req,
@@ -18,6 +20,7 @@ import { CreateEvaluationPeriodDto } from './dto/create-evaluation-period.dto';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { EvaluationsService } from './evaluations.service';
 import { UpdateEvaluationSettingsDto } from './dto/update-evaluation-settings.dto';
+import { UpdateEvaluationPeriodDto } from './dto/update-evaluation-period.dto';
 
 @Controller('evaluations')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -28,6 +31,20 @@ export class EvaluationsController {
   @Post('periods')
   createPeriod(@Body() dto: CreateEvaluationPeriodDto) {
     return this.evaluationsService.createPeriod(dto);
+  }
+
+  @Patch('periods/:id')
+  updatePeriod(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateEvaluationPeriodDto,
+  ) {
+    return this.evaluationsService.updatePeriod(id, dto);
+  }
+
+  @Delete('periods/:id')
+  @Roles(UserRole.ADMIN)
+  deletePeriod(@Param('id', ParseUUIDPipe) id: string) {
+    return this.evaluationsService.deletePeriod(id);
   }
 
   @Get('periods')

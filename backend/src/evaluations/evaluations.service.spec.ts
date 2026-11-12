@@ -1,8 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { DataSource } from 'typeorm';
+import { DataSource, QueryFailedError } from 'typeorm';
 import { EvaluationsService } from './evaluations.service';
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
@@ -22,6 +23,7 @@ describe('EvaluationsService', () => {
     save: jest.fn(),
     count: jest.fn(),
     update: jest.fn(),
+    delete: jest.fn(),
   };
 
   const createRepositoryMock = () => ({
@@ -177,6 +179,276 @@ describe('EvaluationsService', () => {
       });
 
       expect(result).toEqual(periods);
+    });
+
+    describe('Edição de períodos de avaliação', () => {
+      function makePeriod() {
+        return {
+          id: 'period-id-1',
+          name: 'Avaliação 2027/1',
+          startDate: new Date('2027-03-01T00:00:00.000Z'),
+          endDate: new Date('2027-03-31T23:59:59.000Z'),
+          active: true,
+        };
+      }
+
+      it('deve atualizar o nome do período mesmo com avaliações vinculadas', async () => {
+        const period = makePeriod();
+
+        evaluationPeriodRepositoryMock.findOne.mockResolvedValue(period);
+        evaluationPeriodRepositoryMock.save.mockImplementation(
+          async (value) => value,
+        );
+
+        const result = await service.updatePeriod(period.id, {
+          name: 'Avaliação de Disciplinas 2027/1',
+        });
+
+        expect(result.name).toBe('Avaliação de Disciplinas 2027/1');
+
+        expect(evaluationRepositoryMock.count).not.toHaveBeenCalled();
+        expect(evaluationPeriodRepositoryMock.save).toHaveBeenCalledTimes(1);
+      });
+
+      it('deve permitir alterar a data final quando não existem avaliações', async () => {
+        const period = makePeriod();
+
+        evaluationPeriodRepositoryMock.findOne.mockResolvedValue(period);
+        evaluationRepositoryMock.count.mockResolvedValue(0);
+        evaluationPeriodRepositoryMock.save.mockImplementation(
+          async (value) => value,
+        );
+
+        const result = await service.updatePeriod(period.id, {
+          endDate: '2027-04-15T23:59:59.000Z',
+        });
+
+        expect(evaluationRepositoryMock.count).toHaveBeenCalledWith({
+          where: {
+            evaluationPeriod: { id: period.id },
+          },
+        });
+
+        expect(result.endDate).toEqual(new Date('2027-04-15T23:59:59.000Z'));
+
+        expect(evaluationPeriodRepositoryMock.save).toHaveBeenCalledTimes(1);
+      });
+
+      it('deve impedir alteração de datas quando existem avaliações', async () => {
+        const period = makePeriod();
+
+        evaluationPeriodRepositoryMock.findOne.mockResolvedValue(period);
+        evaluationRepositoryMock.count.mockResolvedValue(2);
+
+        await expect(
+          service.updatePeriod(period.id, {
+            endDate: '2027-04-15T23:59:59.000Z',
+          }),
+        ).rejects.toThrow(ConflictException);
+
+        expect(evaluationRepositoryMock.count).toHaveBeenCalledWith({
+          where: {
+            evaluationPeriod: { id: period.id },
+          },
+        });
+
+        expect(evaluationPeriodRepositoryMock.save).not.toHaveBeenCalled();
+      });
+
+      it('deve rejeitar data final anterior à data inicial', async () => {
+        const period = makePeriod();
+
+        evaluationPeriodRepositoryMock.findOne.mockResolvedValue(period);
+
+        await expect(
+          service.updatePeriod(period.id, {
+            endDate: '2027-02-28T23:59:59.000Z',
+          }),
+        ).rejects.toThrow(BadRequestException);
+
+        expect(evaluationPeriodRepositoryMock.save).not.toHaveBeenCalled();
+      });
+
+      it('deve rejeitar datas inválidas na edição', async () => {
+        const period = makePeriod();
+
+        evaluationPeriodRepositoryMock.findOne.mockResolvedValue(period);
+
+        await expect(
+          service.updatePeriod(period.id, {
+            startDate: 'data-invalida',
+          }),
+        ).rejects.toThrow(BadRequestException);
+
+        expect(evaluationPeriodRepositoryMock.save).not.toHaveBeenCalled();
+      });
+
+      it('deve rejeitar edição de período inexistente', async () => {
+        evaluationPeriodRepositoryMock.findOne.mockResolvedValue(null);
+
+        await expect(
+          service.updatePeriod('period-id-inexistente', {
+            name: 'Novo nome',
+          }),
+        ).rejects.toThrow(NotFoundException);
+
+        expect(evaluationPeriodRepositoryMock.save).not.toHaveBeenCalled();
+      });
+
+      it('deve rejeitar atualização sem campos', async () => {
+        const period = makePeriod();
+
+        evaluationPeriodRepositoryMock.findOne.mockResolvedValue(period);
+
+        await expect(service.updatePeriod(period.id, {})).rejects.toThrow(
+          BadRequestException,
+        );
+
+        expect(evaluationPeriodRepositoryMock.save).not.toHaveBeenCalled();
+      });
+
+      it('deve permitir manter as mesmas datas sem consultar avaliações', async () => {
+        const period = makePeriod();
+
+        evaluationPeriodRepositoryMock.findOne.mockResolvedValue(period);
+        evaluationPeriodRepositoryMock.save.mockImplementation(
+          async (value) => value,
+        );
+
+        const result = await service.updatePeriod(period.id, {
+          name: 'Avaliação 2027/1 - Revisada',
+          startDate: '2027-03-01T00:00:00.000Z',
+          endDate: '2027-03-31T23:59:59.000Z',
+        });
+
+        expect(result.name).toBe('Avaliação 2027/1 - Revisada');
+
+        expect(result.startDate).toEqual(new Date('2027-03-01T00:00:00.000Z'));
+
+        expect(result.endDate).toEqual(new Date('2027-03-31T23:59:59.000Z'));
+
+        expect(evaluationRepositoryMock.count).not.toHaveBeenCalled();
+        expect(evaluationPeriodRepositoryMock.save).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe('Exclusão de períodos de avaliação', () => {
+      it('deve excluir um período sem avaliações vinculadas', async () => {
+        const periodId = 'period-id-1';
+
+        evaluationPeriodRepositoryMock.findOne.mockResolvedValue({
+          id: periodId,
+          name: 'Período de teste',
+        });
+
+        evaluationRepositoryMock.count.mockResolvedValue(0);
+
+        evaluationPeriodRepositoryMock.delete.mockResolvedValue({
+          affected: 1,
+        });
+
+        const result = await service.deletePeriod(periodId);
+
+        expect(evaluationRepositoryMock.count).toHaveBeenCalledWith({
+          where: {
+            evaluationPeriod: { id: periodId },
+          },
+        });
+
+        expect(evaluationPeriodRepositoryMock.delete).toHaveBeenCalledWith(
+          periodId,
+        );
+
+        expect(result).toEqual({
+          message: 'Período de avaliação excluído com sucesso.',
+        });
+      });
+
+      it('deve impedir exclusão de período com avaliações vinculadas', async () => {
+        const periodId = 'period-id-1';
+
+        evaluationPeriodRepositoryMock.findOne.mockResolvedValue({
+          id: periodId,
+          name: 'Avaliação 2027/1',
+        });
+
+        evaluationRepositoryMock.count.mockResolvedValue(2);
+
+        await expect(service.deletePeriod(periodId)).rejects.toThrow(
+          ConflictException,
+        );
+
+        expect(evaluationRepositoryMock.count).toHaveBeenCalledWith({
+          where: {
+            evaluationPeriod: { id: periodId },
+          },
+        });
+
+        expect(evaluationPeriodRepositoryMock.delete).not.toHaveBeenCalled();
+      });
+
+      it('deve rejeitar exclusão de período inexistente', async () => {
+        evaluationPeriodRepositoryMock.findOne.mockResolvedValue(null);
+
+        await expect(
+          service.deletePeriod('period-id-inexistente'),
+        ).rejects.toThrow(NotFoundException);
+
+        expect(evaluationRepositoryMock.count).not.toHaveBeenCalled();
+        expect(evaluationPeriodRepositoryMock.delete).not.toHaveBeenCalled();
+      });
+
+      it('deve tratar exclusão sem registro afetado', async () => {
+        const periodId = 'period-id-1';
+
+        evaluationPeriodRepositoryMock.findOne.mockResolvedValue({
+          id: periodId,
+          name: 'Avaliação 2027/1',
+        });
+
+        evaluationRepositoryMock.count.mockResolvedValue(0);
+
+        evaluationPeriodRepositoryMock.delete.mockResolvedValue({
+          affected: 0,
+        });
+
+        await expect(service.deletePeriod(periodId)).rejects.toThrow(
+          NotFoundException,
+        );
+
+        expect(evaluationPeriodRepositoryMock.delete).toHaveBeenCalledWith(
+          periodId,
+        );
+      });
+
+      it('deve tratar erro de chave estrangeira ao excluir período', async () => {
+        const periodId = 'period-id-1';
+
+        evaluationPeriodRepositoryMock.findOne.mockResolvedValue({
+          id: periodId,
+          name: 'Avaliação 2027/1',
+        });
+
+        evaluationRepositoryMock.count.mockResolvedValue(0);
+
+        evaluationPeriodRepositoryMock.delete.mockRejectedValue(
+          new QueryFailedError(
+            'DELETE FROM evaluation_periods WHERE id = $1',
+            [periodId],
+            Object.assign(new Error('Violação de chave estrangeira'), {
+              code: '23503',
+            }),
+          ),
+        );
+
+        await expect(service.deletePeriod(periodId)).rejects.toThrow(
+          ConflictException,
+        );
+
+        expect(evaluationPeriodRepositoryMock.delete).toHaveBeenCalledWith(
+          periodId,
+        );
+      });
     });
   });
 
