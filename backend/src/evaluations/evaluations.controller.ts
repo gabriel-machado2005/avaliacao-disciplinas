@@ -21,6 +21,7 @@ import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { EvaluationsService } from './evaluations.service';
 import { UpdateEvaluationSettingsDto } from './dto/update-evaluation-settings.dto';
 import { UpdateEvaluationPeriodDto } from './dto/update-evaluation-period.dto';
+import { UpdateEvaluationDto } from './dto/update-evaluation.dto';
 
 @Controller('evaluations')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -60,6 +61,20 @@ export class EvaluationsController {
   @Get()
   findEvaluations() {
     return this.evaluationsService.findEvaluations();
+  }
+
+  @Delete(':id')
+  @Roles(UserRole.ADMIN)
+  deleteEvaluation(@Param('id', ParseUUIDPipe) id: string) {
+    return this.evaluationsService.deleteEvaluation(id);
+  }
+
+  @Patch(':id')
+  updateEvaluation(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateEvaluationDto,
+  ) {
+    return this.evaluationsService.updateEvaluation(id, dto);
   }
 
   @Get('professor/my')

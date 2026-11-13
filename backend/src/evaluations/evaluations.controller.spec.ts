@@ -14,6 +14,8 @@ describe('EvaluationsController', () => {
     deletePeriod: jest.fn(),
     findPeriods: jest.fn(),
     createEvaluation: jest.fn(),
+    deleteEvaluation: jest.fn(),
+    updateEvaluation: jest.fn(),
     findEvaluations: jest.fn(),
     findProfessorEvaluations: jest.fn(),
     createEligibility: jest.fn(),
@@ -180,6 +182,73 @@ describe('EvaluationsController', () => {
       expect(evaluationsServiceMock.createEvaluation).toHaveBeenCalledTimes(1);
 
       expect(result).toEqual(evaluation);
+    });
+
+    it('deve encaminhar a exclusão de uma avaliação ao serviço', async () => {
+      const evaluationId = '550e8400-e29b-41d4-a716-446655440000';
+
+      const response = {
+        message: 'Avaliação excluída com sucesso.',
+      };
+
+      evaluationsServiceMock.deleteEvaluation.mockResolvedValue(response);
+
+      const result = await controller.deleteEvaluation(evaluationId);
+
+      expect(evaluationsServiceMock.deleteEvaluation).toHaveBeenCalledWith(
+        evaluationId,
+      );
+
+      expect(evaluationsServiceMock.deleteEvaluation).toHaveBeenCalledTimes(1);
+
+      expect(result).toEqual(response);
+    });
+
+    it('deve encaminhar a edição de uma avaliação ao serviço', async () => {
+      const evaluationId = '550e8400-e29b-41d4-a716-446655440000';
+
+      const dto = {
+        questionnaireId: '660e8400-e29b-41d4-a716-446655440001',
+        minResponsesForResults: 5,
+      };
+
+      const updatedEvaluation = {
+        id: evaluationId,
+        evaluationPeriod: {
+          id: '770e8400-e29b-41d4-a716-446655440002',
+        },
+        classGroup: {
+          id: '880e8400-e29b-41d4-a716-446655440003',
+        },
+        questionnaire: {
+          id: dto.questionnaireId,
+        },
+        minResponsesForResults: dto.minResponsesForResults,
+      };
+
+      evaluationsServiceMock.updateEvaluation.mockResolvedValue(
+        updatedEvaluation,
+      );
+
+      const result = await controller.updateEvaluation(evaluationId, dto);
+
+      expect(evaluationsServiceMock.updateEvaluation).toHaveBeenCalledWith(
+        evaluationId,
+        dto,
+      );
+
+      expect(evaluationsServiceMock.updateEvaluation).toHaveBeenCalledTimes(1);
+
+      expect(result).toEqual(updatedEvaluation);
+    });
+
+    it('deve restringir a exclusão de avaliações aos administradores', () => {
+      const roles = Reflect.getMetadata(
+        'roles',
+        EvaluationsController.prototype.deleteEvaluation,
+      );
+
+      expect(roles).toEqual([UserRole.ADMIN]);
     });
 
     it('deve retornar a lista de avaliações cadastradas', async () => {

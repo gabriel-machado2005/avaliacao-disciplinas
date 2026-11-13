@@ -13,6 +13,9 @@ import { Answer } from './entities/answer.entity';
 import { EvaluationEligibility } from './entities/evaluation-eligibility.entity';
 import { Evaluation } from './entities/evaluation.entity';
 import { Submission } from './entities/submission.entity';
+import { EvaluationPeriod } from './entities/evaluation-period.entity';
+import { Questionnaire } from '../questionnaires/entities/questionnaire.entity';
+import { ClassGroup } from '../academic/entities/class-group.entity';
 
 describe('EvaluationsService', () => {
   let service: EvaluationsService;
@@ -33,6 +36,7 @@ describe('EvaluationsService', () => {
     save: jest.fn(),
     count: jest.fn(),
     update: jest.fn(),
+    delete: jest.fn(),
   });
 
   const evaluationRepositoryMock = createRepositoryMock();
@@ -603,6 +607,525 @@ describe('EvaluationsService', () => {
       expect(evaluationRepositoryMock.create).not.toHaveBeenCalled();
 
       expect(evaluationRepositoryMock.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Exclusão de avaliações', () => {
+    const evaluationId = 'evaluation-id-1';
+
+    const transactionEvaluationRepositoryMock = {
+      findOne: jest.fn(),
+      delete: jest.fn(),
+    };
+
+    const transactionEligibilityRepositoryMock = {
+      count: jest.fn(),
+    };
+
+    const transactionSubmissionRepositoryMock = {
+      count: jest.fn(),
+    };
+
+    const transactionManagerMock = {
+      getRepository: jest.fn(),
+    };
+
+    beforeEach(() => {
+      transactionManagerMock.getRepository.mockImplementation((entity) => {
+        if (entity === Evaluation) {
+          return transactionEvaluationRepositoryMock;
+        }
+
+        if (entity === EvaluationEligibility) {
+          return transactionEligibilityRepositoryMock;
+        }
+
+        if (entity === Submission) {
+          return transactionSubmissionRepositoryMock;
+        }
+
+        throw new Error('Repositório não esperado no teste.');
+      });
+
+      dataSourceMock.transaction.mockImplementation(async (operation) =>
+        operation(transactionManagerMock),
+      );
+
+      transactionEvaluationRepositoryMock.findOne.mockResolvedValue({
+        id: evaluationId,
+      });
+
+      transactionEvaluationRepositoryMock.delete.mockResolvedValue({
+        affected: 1,
+      });
+
+      transactionEligibilityRepositoryMock.count.mockResolvedValue(0);
+
+      transactionSubmissionRepositoryMock.count.mockResolvedValue(0);
+    });
+
+    it('deve excluir uma avaliação sem estudantes ou respostas vinculadas', async () => {
+      const result = await service.deleteEvaluation(evaluationId);
+
+      expect(dataSourceMock.transaction).toHaveBeenCalledTimes(1);
+
+      expect(transactionManagerMock.getRepository).toHaveBeenCalledWith(
+        Evaluation,
+      );
+
+      expect(transactionManagerMock.getRepository).toHaveBeenCalledWith(
+        EvaluationEligibility,
+      );
+
+      expect(transactionManagerMock.getRepository).toHaveBeenCalledWith(
+        Submission,
+      );
+
+      expect(transactionEvaluationRepositoryMock.findOne).toHaveBeenCalledWith({
+        where: { id: evaluationId },
+        lock: {
+          mode: 'pessimistic_write',
+        },
+      });
+
+      expect(transactionEligibilityRepositoryMock.count).toHaveBeenCalledWith({
+        where: {
+          evaluation: { id: evaluationId },
+        },
+      });
+
+      expect(transactionSubmissionRepositoryMock.count).toHaveBeenCalledWith({
+        where: {
+          evaluation: { id: evaluationId },
+        },
+      });
+
+      expect(transactionEvaluationRepositoryMock.delete).toHaveBeenCalledWith(
+        evaluationId,
+      );
+
+      expect(dataSourceMock.getRepository).not.toHaveBeenCalled();
+
+      expect(result).toEqual({
+        message: 'Avaliação excluída com sucesso.',
+      });
+    });
+
+    it('deve impedir exclusão quando existem estudantes habilitados', async () => {
+      transactionEligibilityRepositoryMock.count.mockResolvedValue(3);
+
+      await expect(service.deleteEvaluation(evaluationId)).rejects.toThrow(
+        ConflictException,
+      );
+
+      expect(transactionSubmissionRepositoryMock.count).not.toHaveBeenCalled();
+
+      expect(transactionEvaluationRepositoryMock.delete).not.toHaveBeenCalled();
+    });
+
+    it('deve impedir exclusão quando existem respostas registradas', async () => {
+      transactionSubmissionRepositoryMock.count.mockResolvedValue(2);
+
+      await expect(service.deleteEvaluation(evaluationId)).rejects.toThrow(
+        ConflictException,
+      );
+
+      expect(transactionSubmissionRepositoryMock.count).toHaveBeenCalledWith({
+        where: {
+          evaluation: { id: evaluationId },
+        },
+      });
+
+      expect(transactionEvaluationRepositoryMock.delete).not.toHaveBeenCalled();
+    });
+
+    it('deve rejeitar exclusão de avaliação inexistente', async () => {
+      transactionEvaluationRepositoryMock.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.deleteEvaluation('evaluation-id-inexistente'),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(transactionEligibilityRepositoryMock.count).not.toHaveBeenCalled();
+
+      expect(transactionSubmissionRepositoryMock.count).not.toHaveBeenCalled();
+
+      expect(transactionEvaluationRepositoryMock.delete).not.toHaveBeenCalled();
+    });
+
+    it('deve tratar exclusão que não afetou nenhum registro', async () => {
+      transactionEvaluationRepositoryMock.delete.mockResolvedValue({
+        affected: 0,
+      });
+
+      await expect(service.deleteEvaluation(evaluationId)).rejects.toThrow(
+        NotFoundException,
+      );
+
+      expect(transactionEvaluationRepositoryMock.delete).toHaveBeenCalledWith(
+        evaluationId,
+      );
+    });
+
+    it('deve tratar violação de chave estrangeira na exclusão', async () => {
+      transactionEvaluationRepositoryMock.delete.mockRejectedValue(
+        new QueryFailedError(
+          'DELETE FROM evaluations WHERE id = $1',
+          [evaluationId],
+          Object.assign(new Error('Violação de chave estrangeira'), {
+            code: '23503',
+          }),
+        ),
+      );
+
+      await expect(service.deleteEvaluation(evaluationId)).rejects.toThrow(
+        ConflictException,
+      );
+
+      expect(transactionEvaluationRepositoryMock.delete).toHaveBeenCalledWith(
+        evaluationId,
+      );
+    });
+  });
+
+  describe('Edição de avaliações', () => {
+    const evaluationId = 'evaluation-id-1';
+
+    const transactionEvaluationRepositoryMock = {
+      findOne: jest.fn(),
+      save: jest.fn(),
+    };
+
+    const transactionEligibilityRepositoryMock = {
+      count: jest.fn(),
+    };
+
+    const transactionSubmissionRepositoryMock = {
+      count: jest.fn(),
+    };
+
+    const transactionPeriodRepositoryMock = {
+      findOne: jest.fn(),
+    };
+
+    const transactionClassGroupRepositoryMock = {
+      findOne: jest.fn(),
+    };
+
+    const transactionQuestionnaireRepositoryMock = {
+      findOne: jest.fn(),
+    };
+
+    const transactionManagerMock = {
+      getRepository: jest.fn(),
+    };
+
+    beforeEach(() => {
+      const evaluation = {
+        id: evaluationId,
+        evaluationPeriod: {
+          id: 'period-id-1',
+          active: true,
+        },
+        classGroup: {
+          id: 'class-group-id-1',
+        },
+        questionnaire: {
+          id: 'questionnaire-id-1',
+          active: true,
+        },
+        minResponsesForResults: 3,
+      };
+
+      transactionEvaluationRepositoryMock.findOne.mockResolvedValue(evaluation);
+
+      transactionEvaluationRepositoryMock.save.mockImplementation(
+        async (value) => value,
+      );
+
+      transactionEligibilityRepositoryMock.count.mockResolvedValue(0);
+
+      transactionSubmissionRepositoryMock.count.mockResolvedValue(0);
+
+      transactionPeriodRepositoryMock.findOne.mockResolvedValue({
+        id: 'period-id-2',
+        active: true,
+      });
+
+      transactionClassGroupRepositoryMock.findOne.mockResolvedValue({
+        id: 'class-group-id-2',
+      });
+
+      transactionQuestionnaireRepositoryMock.findOne.mockResolvedValue({
+        id: 'questionnaire-id-2',
+        active: true,
+      });
+
+      transactionManagerMock.getRepository.mockImplementation((entity) => {
+        if (entity === Evaluation) {
+          return transactionEvaluationRepositoryMock;
+        }
+
+        if (entity === EvaluationEligibility) {
+          return transactionEligibilityRepositoryMock;
+        }
+
+        if (entity === Submission) {
+          return transactionSubmissionRepositoryMock;
+        }
+
+        if (entity === EvaluationPeriod) {
+          return transactionPeriodRepositoryMock;
+        }
+
+        if (entity === ClassGroup) {
+          return transactionClassGroupRepositoryMock;
+        }
+
+        if (entity === Questionnaire) {
+          return transactionQuestionnaireRepositoryMock;
+        }
+
+        throw new Error('Repositório não esperado no teste.');
+      });
+
+      dataSourceMock.transaction.mockImplementation(async (operation) =>
+        operation(transactionManagerMock),
+      );
+    });
+
+    it('deve atualizar somente o mínimo de respostas', async () => {
+      const result = await service.updateEvaluation(evaluationId, {
+        minResponsesForResults: 5,
+      });
+
+      expect(dataSourceMock.transaction).toHaveBeenCalledTimes(1);
+
+      expect(
+        transactionEvaluationRepositoryMock.findOne,
+      ).toHaveBeenNthCalledWith(1, {
+        where: { id: evaluationId },
+        lock: {
+          mode: 'pessimistic_write',
+        },
+      });
+
+      expect(result.minResponsesForResults).toBe(5);
+
+      expect(transactionEligibilityRepositoryMock.count).not.toHaveBeenCalled();
+
+      expect(transactionSubmissionRepositoryMock.count).not.toHaveBeenCalled();
+
+      expect(transactionEvaluationRepositoryMock.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('deve rejeitar atualização sem campos', async () => {
+      await expect(service.updateEvaluation(evaluationId, {})).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(dataSourceMock.transaction).not.toHaveBeenCalled();
+    });
+
+    it('deve rejeitar edição de avaliação inexistente', async () => {
+      transactionEvaluationRepositoryMock.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.updateEvaluation('evaluation-id-inexistente', {
+          minResponsesForResults: 5,
+        }),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(transactionEvaluationRepositoryMock.save).not.toHaveBeenCalled();
+    });
+
+    it('deve permitir trocar questionário quando não existem vínculos', async () => {
+      const result = await service.updateEvaluation(evaluationId, {
+        questionnaireId: 'questionnaire-id-2',
+      });
+
+      expect(transactionEligibilityRepositoryMock.count).toHaveBeenCalledWith({
+        where: {
+          evaluation: { id: evaluationId },
+        },
+      });
+
+      expect(transactionSubmissionRepositoryMock.count).toHaveBeenCalledWith({
+        where: {
+          evaluation: { id: evaluationId },
+        },
+      });
+
+      expect(result.questionnaire.id).toBe('questionnaire-id-2');
+
+      expect(transactionEvaluationRepositoryMock.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('deve impedir troca de questionário com estudantes habilitados', async () => {
+      transactionEligibilityRepositoryMock.count.mockResolvedValue(3);
+
+      await expect(
+        service.updateEvaluation(evaluationId, {
+          questionnaireId: 'questionnaire-id-2',
+        }),
+      ).rejects.toThrow(ConflictException);
+
+      expect(transactionSubmissionRepositoryMock.count).not.toHaveBeenCalled();
+
+      expect(transactionEvaluationRepositoryMock.save).not.toHaveBeenCalled();
+    });
+
+    it('deve impedir troca de questionário com respostas registradas', async () => {
+      transactionSubmissionRepositoryMock.count.mockResolvedValue(2);
+
+      await expect(
+        service.updateEvaluation(evaluationId, {
+          questionnaireId: 'questionnaire-id-2',
+        }),
+      ).rejects.toThrow(ConflictException);
+
+      expect(transactionSubmissionRepositoryMock.count).toHaveBeenCalledWith({
+        where: {
+          evaluation: { id: evaluationId },
+        },
+      });
+
+      expect(transactionEvaluationRepositoryMock.save).not.toHaveBeenCalled();
+    });
+
+    it('deve impedir mudança de período que gera avaliação duplicada', async () => {
+      transactionEvaluationRepositoryMock.findOne
+        .mockResolvedValueOnce({
+          id: evaluationId,
+        })
+        .mockResolvedValueOnce({
+          id: evaluationId,
+          evaluationPeriod: { id: 'period-id-1' },
+          classGroup: { id: 'class-group-id-1' },
+          questionnaire: { id: 'questionnaire-id-1' },
+          minResponsesForResults: 3,
+        })
+        .mockResolvedValueOnce({
+          id: 'outra-avaliacao-id',
+        });
+
+      await expect(
+        service.updateEvaluation(evaluationId, {
+          evaluationPeriodId: 'period-id-2',
+        }),
+      ).rejects.toThrow(ConflictException);
+
+      expect(
+        transactionEvaluationRepositoryMock.findOne,
+      ).toHaveBeenLastCalledWith({
+        where: {
+          evaluationPeriod: { id: 'period-id-2' },
+          classGroup: { id: 'class-group-id-1' },
+        },
+      });
+
+      expect(transactionEvaluationRepositoryMock.save).not.toHaveBeenCalled();
+    });
+
+    it('deve rejeitar troca para questionário inativo', async () => {
+      transactionQuestionnaireRepositoryMock.findOne.mockResolvedValue({
+        id: 'questionnaire-id-2',
+        active: false,
+      });
+
+      await expect(
+        service.updateEvaluation(evaluationId, {
+          questionnaireId: 'questionnaire-id-2',
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(transactionEvaluationRepositoryMock.save).not.toHaveBeenCalled();
+    });
+
+    it('deve permitir trocar a turma quando não existem vínculos', async () => {
+      const result = await service.updateEvaluation(evaluationId, {
+        classGroupId: 'class-group-id-2',
+      });
+
+      expect(transactionClassGroupRepositoryMock.findOne).toHaveBeenCalledWith({
+        where: { id: 'class-group-id-2' },
+      });
+
+      expect(transactionEligibilityRepositoryMock.count).toHaveBeenCalledTimes(
+        1,
+      );
+
+      expect(transactionSubmissionRepositoryMock.count).toHaveBeenCalledTimes(
+        1,
+      );
+
+      expect(
+        transactionEvaluationRepositoryMock.findOne,
+      ).toHaveBeenLastCalledWith({
+        where: {
+          evaluationPeriod: { id: 'period-id-1' },
+          classGroup: { id: 'class-group-id-2' },
+        },
+      });
+
+      expect(result.classGroup.id).toBe('class-group-id-2');
+
+      expect(transactionEvaluationRepositoryMock.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('deve rejeitar troca para turma inexistente', async () => {
+      transactionClassGroupRepositoryMock.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.updateEvaluation(evaluationId, {
+          classGroupId: 'class-group-inexistente',
+        }),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(transactionEvaluationRepositoryMock.save).not.toHaveBeenCalled();
+    });
+
+    it('deve rejeitar troca para período inativo', async () => {
+      transactionPeriodRepositoryMock.findOne.mockResolvedValue({
+        id: 'period-id-2',
+        active: false,
+      });
+
+      await expect(
+        service.updateEvaluation(evaluationId, {
+          evaluationPeriodId: 'period-id-2',
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(transactionEvaluationRepositoryMock.save).not.toHaveBeenCalled();
+    });
+
+    it('deve tratar duplicidade identificada pelo PostgreSQL', async () => {
+      transactionEvaluationRepositoryMock.save.mockRejectedValue(
+        new QueryFailedError(
+          'UPDATE evaluations SET class_group_id = $1',
+          ['class-group-id-2'],
+          Object.assign(new Error('Violação de unicidade'), { code: '23505' }),
+        ),
+      );
+
+      await expect(
+        service.updateEvaluation(evaluationId, {
+          classGroupId: 'class-group-id-2',
+        }),
+      ).rejects.toThrow(ConflictException);
+
+      expect(transactionEvaluationRepositoryMock.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('deve rejeitar mínimo de respostas inferior a dois', async () => {
+      await expect(
+        service.updateEvaluation(evaluationId, {
+          minResponsesForResults: 1,
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(dataSourceMock.transaction).not.toHaveBeenCalled();
     });
   });
 

@@ -25,6 +25,7 @@ type Section =
 
 export default function AdministrativePanel({ role }: Props) {
   const [activeSection, setActiveSection] = useState<Section>("evaluations");
+  const [evaluationsRefreshKey, setEvaluationsRefreshKey] = useState(0);
 
   return (
     <div>
@@ -103,11 +104,19 @@ export default function AdministrativePanel({ role }: Props) {
 
       {activeSection === "evaluations" ? (
         <>
-          <EvaluationManagement />
+          <EvaluationManagement
+            role={role}
+            onEvaluationsChanged={() =>
+              setEvaluationsRefreshKey((previous) => previous + 1)
+            }
+          />
 
           <h2 style={{ marginTop: "32px" }}>Avaliações cadastradas</h2>
 
-          <ProfessorEvaluations role={role} />
+          <ProfessorEvaluations
+            role={role}
+            refreshKey={evaluationsRefreshKey}
+          />
         </>
       ) : activeSection === "courses" ? (
         <AcademicCourses role={role} />

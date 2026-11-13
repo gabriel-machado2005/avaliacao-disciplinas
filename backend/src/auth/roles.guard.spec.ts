@@ -30,7 +30,8 @@ describe('RolesGuard - permissões acadêmicas', () => {
   }
 
   function createEvaluationContext(
-    method: 'deletePeriod' | 'findPeriods',
+    method:
+      'deletePeriod' | 'findPeriods' | 'deleteEvaluation' | 'updateEvaluation',
     role: UserRole,
   ): ExecutionContext {
     return {
@@ -130,6 +131,54 @@ describe('RolesGuard - permissões acadêmicas', () => {
 
   it('deve impedir que um estudante consulte períodos pelo módulo administrativo', () => {
     const context = createEvaluationContext('findPeriods', UserRole.STUDENT);
+
+    expect(guard.canActivate(context)).toBe(false);
+  });
+
+  it('deve permitir que um administrador exclua avaliações', () => {
+    const context = createEvaluationContext('deleteEvaluation', UserRole.ADMIN);
+
+    expect(guard.canActivate(context)).toBe(true);
+  });
+
+  it('deve impedir que um coordenador exclua avaliações', () => {
+    const context = createEvaluationContext(
+      'deleteEvaluation',
+      UserRole.COORDINATOR,
+    );
+
+    expect(guard.canActivate(context)).toBe(false);
+  });
+
+  it('deve permitir que um administrador edite avaliações', () => {
+    const context = createEvaluationContext('updateEvaluation', UserRole.ADMIN);
+
+    expect(guard.canActivate(context)).toBe(true);
+  });
+
+  it('deve permitir que um coordenador edite avaliações', () => {
+    const context = createEvaluationContext(
+      'updateEvaluation',
+      UserRole.COORDINATOR,
+    );
+
+    expect(guard.canActivate(context)).toBe(true);
+  });
+
+  it('deve impedir que um professor edite avaliações', () => {
+    const context = createEvaluationContext(
+      'updateEvaluation',
+      UserRole.PROFESSOR,
+    );
+
+    expect(guard.canActivate(context)).toBe(false);
+  });
+
+  it('deve impedir que um estudante edite avaliações', () => {
+    const context = createEvaluationContext(
+      'updateEvaluation',
+      UserRole.STUDENT,
+    );
 
     expect(guard.canActivate(context)).toBe(false);
   });

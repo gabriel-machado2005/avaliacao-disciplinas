@@ -22,6 +22,7 @@ import { Answer } from './entities/answer.entity';
 import { Submission } from './entities/submission.entity';
 import { UpdateEvaluationSettingsDto } from './dto/update-evaluation-settings.dto';
 import { UpdateEvaluationPeriodDto } from './dto/update-evaluation-period.dto';
+import { UpdateEvaluationDto } from './dto/update-evaluation.dto';
 
 @Injectable()
 export class EvaluationsService {
@@ -265,6 +266,265 @@ export class EvaluationsService {
         createdAt: 'DESC',
       },
     });
+  }
+
+  async deleteEvaluation(id: string) {
+    try {
+      return await this.dataSource.transaction(async (manager) => {
+        const evaluationRepo = manager.getRepository(Evaluation);
+
+        const eligibilityRepo = manager.getRepository(EvaluationEligibility);
+
+        const submissionRepo = manager.getRepository(Submission);
+
+        const evaluation = await evaluationRepo.findOne({
+          where: { id },
+          lock: {
+            mode: 'pessimistic_write',
+          },
+        });
+
+        if (!evaluation) {
+          throw new NotFoundException('Avaliação não encontrada.');
+        }
+
+        const linkedStudents = await eligibilityRepo.count({
+          where: {
+            evaluation: { id },
+          },
+        });
+
+        if (linkedStudents > 0) {
+          throw new ConflictException(
+            'Não é possível excluir esta avaliação porque existem estudantes habilitados.',
+          );
+        }
+
+        const linkedSubmissions = await submissionRepo.count({
+          where: {
+            evaluation: { id },
+          },
+        });
+
+        if (linkedSubmissions > 0) {
+          throw new ConflictException(
+            'Não é possível excluir esta avaliação porque existem respostas registradas.',
+          );
+        }
+
+        const result = await evaluationRepo.delete(id);
+
+        if (!result.affected) {
+          throw new NotFoundException('Avaliação não encontrada.');
+        }
+
+        return {
+          message: 'Avaliação excluída com sucesso.',
+        };
+      });
+    } catch (error) {
+      if (
+        error instanceof QueryFailedError &&
+        (error.driverError as { code?: string }).code === '23503'
+      ) {
+        throw new ConflictException(
+          'Não é possível excluir esta avaliação porque existem registros vinculados.',
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  async updateEvaluation(id: string, dto: UpdateEvaluationDto) {
+    const hasFields =
+      dto.evaluationPeriodId !== undefined ||
+      dto.classGroupId !== undefined ||
+      dto.questionnaireId !== undefined ||
+      dto.minResponsesForResults !== undefined;
+
+    if (!hasFields) {
+      throw new BadRequestException(
+        'Informe pelo menos um campo para atualizar.',
+      );
+    }
+
+    if (
+      Object.values(dto).some((value) => value === null) ||
+      (dto.minResponsesForResults !== undefined &&
+        (!Number.isInteger(dto.minResponsesForResults) ||
+          dto.minResponsesForResults < 2))
+    ) {
+      throw new BadRequestException(
+        'Informe valores válidos para a atualização.',
+      );
+    }
+
+    try {
+      return await this.dataSource.transaction(async (manager) => {
+        const evaluationRepo = manager.getRepository(Evaluation);
+
+        // Primeiro bloqueamos somente a linha da avaliação.
+        const lockedEvaluation = await evaluationRepo.findOne({
+          where: { id },
+          lock: { mode: 'pessimistic_write' },
+        });
+
+        if (!lockedEvaluation) {
+          throw new NotFoundException('Avaliação não encontrada.');
+        }
+
+        // Depois carregamos os relacionamentos.
+        const evaluation = await evaluationRepo.findOne({
+          where: { id },
+          relations: {
+            evaluationPeriod: true,
+            classGroup: true,
+            questionnaire: true,
+          },
+        });
+
+        if (!evaluation) {
+          throw new NotFoundException('Avaliação não encontrada.');
+        }
+
+        const periodChanged =
+          dto.evaluationPeriodId !== undefined &&
+          dto.evaluationPeriodId !== evaluation.evaluationPeriod.id;
+
+        const classChanged =
+          dto.classGroupId !== undefined &&
+          dto.classGroupId !== evaluation.classGroup.id;
+
+        const questionnaireChanged =
+          dto.questionnaireId !== undefined &&
+          dto.questionnaireId !== evaluation.questionnaire.id;
+
+        const relationshipsChanged =
+          periodChanged || classChanged || questionnaireChanged;
+
+        // Alterações de vínculos só são permitidas
+        // quando a avaliação ainda não foi utilizada.
+        if (relationshipsChanged) {
+          const linkedStudents = await manager
+            .getRepository(EvaluationEligibility)
+            .count({
+              where: { evaluation: { id } },
+            });
+
+          if (linkedStudents > 0) {
+            throw new ConflictException(
+              'Não é possível alterar os vínculos desta avaliação porque existem estudantes habilitados.',
+            );
+          }
+
+          const linkedSubmissions = await manager
+            .getRepository(Submission)
+            .count({
+              where: { evaluation: { id } },
+            });
+
+          if (linkedSubmissions > 0) {
+            throw new ConflictException(
+              'Não é possível alterar os vínculos desta avaliação porque existem respostas registradas.',
+            );
+          }
+        }
+
+        if (periodChanged) {
+          const period = await manager.getRepository(EvaluationPeriod).findOne({
+            where: { id: dto.evaluationPeriodId },
+          });
+
+          if (!period) {
+            throw new NotFoundException('Período de avaliação não encontrado.');
+          }
+
+          if (!period.active) {
+            throw new BadRequestException(
+              'O período de avaliação está inativo.',
+            );
+          }
+
+          evaluation.evaluationPeriod = period;
+        }
+
+        if (classChanged) {
+          const classGroup = await manager.getRepository(ClassGroup).findOne({
+            where: { id: dto.classGroupId },
+          });
+
+          if (!classGroup) {
+            throw new NotFoundException('Turma não encontrada.');
+          }
+
+          evaluation.classGroup = classGroup;
+        }
+
+        if (questionnaireChanged) {
+          const questionnaire = await manager
+            .getRepository(Questionnaire)
+            .findOne({
+              where: { id: dto.questionnaireId },
+            });
+
+          if (!questionnaire) {
+            throw new NotFoundException('Questionário não encontrado.');
+          }
+
+          if (!questionnaire.active) {
+            throw new BadRequestException('O questionário está inativo.');
+          }
+
+          evaluation.questionnaire = questionnaire;
+        }
+
+        // Impedir duas avaliações para a mesma turma
+        // dentro do mesmo período.
+        if (periodChanged || classChanged) {
+          const duplicate = await evaluationRepo.findOne({
+            where: {
+              evaluationPeriod: {
+                id: evaluation.evaluationPeriod.id,
+              },
+              classGroup: {
+                id: evaluation.classGroup.id,
+              },
+            },
+          });
+
+          if (duplicate && duplicate.id !== id) {
+            throw new ConflictException(
+              'Já existe uma avaliação para esta turma neste período.',
+            );
+          }
+        }
+
+        if (dto.minResponsesForResults !== undefined) {
+          evaluation.minResponsesForResults = dto.minResponsesForResults;
+        }
+
+        return evaluationRepo.save(evaluation);
+      });
+    } catch (error) {
+      if (error instanceof QueryFailedError) {
+        const code = (error.driverError as { code?: string })?.code;
+
+        if (code === '23505') {
+          throw new ConflictException(
+            'Já existe uma avaliação para esta turma neste período.',
+          );
+        }
+
+        if (code === '23503') {
+          throw new ConflictException(
+            'Não foi possível atualizar a avaliação devido a registros vinculados.',
+          );
+        }
+      }
+
+      throw error;
+    }
   }
 
   findProfessorEvaluations(professorId: string) {

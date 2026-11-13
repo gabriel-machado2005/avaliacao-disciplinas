@@ -20,9 +20,13 @@ type ProfessorEvaluation = {
 
 type Props = {
   role?: "PROFESSOR" | "COORDINATOR" | "ADMIN";
+  refreshKey?: number;
 };
 
-export default function ProfessorEvaluations({ role = "PROFESSOR" }: Props) {
+export default function ProfessorEvaluations({
+  role = "PROFESSOR",
+  refreshKey = 0,
+}: Props) {
   const [evaluations, setEvaluations] = useState<ProfessorEvaluation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -78,7 +82,7 @@ export default function ProfessorEvaluations({ role = "PROFESSOR" }: Props) {
     void loadEvaluations();
 
     return () => controller.abort();
-  }, [role]);
+  }, [role, refreshKey]);
 
   if (selectedEvaluationId) {
     return (
