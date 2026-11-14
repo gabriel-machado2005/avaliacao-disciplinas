@@ -1,10 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { QuestionnairesService } from './questionnaires.service';
+import { Evaluation } from '../evaluations/entities/evaluation.entity';
 import { Questionnaire } from './entities/questionnaire.entity';
 import { Dimension } from './entities/dimension.entity';
 import { Question, QuestionType } from './entities/question.entity';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 
 describe('QuestionnairesService', () => {
   let service: QuestionnairesService;
@@ -14,16 +19,20 @@ describe('QuestionnairesService', () => {
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
+    count: jest.fn(),
+    remove: jest.fn(),
   });
 
   let questionnaireRepositoryMock: ReturnType<typeof createRepositoryMock>;
   let dimensionRepositoryMock: ReturnType<typeof createRepositoryMock>;
   let questionRepositoryMock: ReturnType<typeof createRepositoryMock>;
+  let evaluationRepositoryMock: ReturnType<typeof createRepositoryMock>;
 
   beforeEach(async () => {
     questionnaireRepositoryMock = createRepositoryMock();
     dimensionRepositoryMock = createRepositoryMock();
     questionRepositoryMock = createRepositoryMock();
+    evaluationRepositoryMock = createRepositoryMock();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -39,6 +48,10 @@ describe('QuestionnairesService', () => {
         {
           provide: getRepositoryToken(Question),
           useValue: questionRepositoryMock,
+        },
+        {
+          provide: getRepositoryToken(Evaluation),
+          useValue: evaluationRepositoryMock,
         },
       ],
     }).compile();
@@ -181,6 +194,156 @@ describe('QuestionnairesService', () => {
       await expect(
         service.findQuestionnaire('invalid-questionnaire-id'),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('Edição de questionários', () => {
+    const questionnaireId = 'questionnaire-id-1';
+
+    beforeEach(() => {
+      questionnaireRepositoryMock.findOne.mockResolvedValue({
+        id: questionnaireId,
+        name: 'Questionário original',
+        description: 'Descrição original',
+        active: true,
+      });
+
+      questionnaireRepositoryMock.save.mockImplementation(
+        async (questionnaire) => questionnaire,
+      );
+    });
+
+    it('deve atualizar somente o nome do questionário', async () => {
+      const result = await service.updateQuestionnaire(questionnaireId, {
+        name: '  Novo questionário  ',
+      });
+
+      expect(questionnaireRepositoryMock.findOne).toHaveBeenCalledWith({
+        where: { id: questionnaireId },
+      });
+
+      expect(result.name).toBe('Novo questionário');
+      expect(result.description).toBe('Descrição original');
+      expect(result.active).toBe(true);
+
+      expect(questionnaireRepositoryMock.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('deve atualizar somente a descrição', async () => {
+      const result = await service.updateQuestionnaire(questionnaireId, {
+        description: '  Nova descrição  ',
+      });
+
+      expect(result.name).toBe('Questionário original');
+      expect(result.description).toBe('Nova descrição');
+
+      expect(questionnaireRepositoryMock.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'Questionário original',
+          description: 'Nova descrição',
+        }),
+      );
+    });
+
+    it('deve permitir remover a descrição', async () => {
+      const result = await service.updateQuestionnaire(questionnaireId, {
+        description: '',
+      });
+
+      expect(result.description).toBeNull();
+      expect(result.name).toBe('Questionário original');
+    });
+
+    it('deve rejeitar um nome vazio ou inválido', async () => {
+      await expect(
+        service.updateQuestionnaire(questionnaireId, {
+          name: '   ',
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(questionnaireRepositoryMock.save).not.toHaveBeenCalled();
+    });
+
+    it('deve rejeitar atualização sem campos', async () => {
+      await expect(
+        service.updateQuestionnaire(questionnaireId, {}),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(questionnaireRepositoryMock.save).not.toHaveBeenCalled();
+    });
+
+    it('deve rejeitar questionário inexistente', async () => {
+      questionnaireRepositoryMock.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.updateQuestionnaire(questionnaireId, {
+          name: 'Novo nome',
+        }),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(questionnaireRepositoryMock.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Exclusão de questionários', () => {
+    const questionnaireId = 'questionnaire-id-1';
+
+    it('deve excluir um questionário sem avaliações vinculadas', async () => {
+      const questionnaire = {
+        id: questionnaireId,
+        name: 'Questionário de Teste',
+      };
+
+      questionnaireRepositoryMock.findOne.mockResolvedValue(questionnaire);
+      evaluationRepositoryMock.count.mockResolvedValue(0);
+      questionnaireRepositoryMock.remove.mockResolvedValue(questionnaire);
+
+      const result = await service.deleteQuestionnaire(questionnaireId);
+
+      expect(questionnaireRepositoryMock.findOne).toHaveBeenCalledWith({
+        where: { id: questionnaireId },
+      });
+
+      expect(evaluationRepositoryMock.count).toHaveBeenCalledWith({
+        where: {
+          questionnaire: { id: questionnaireId },
+        },
+      });
+
+      expect(questionnaireRepositoryMock.remove).toHaveBeenCalledWith(
+        questionnaire,
+      );
+
+      expect(result).toEqual({
+        message: 'Questionário excluído com sucesso.',
+      });
+    });
+
+    it('deve impedir a exclusão de questionário vinculado a avaliações', async () => {
+      const questionnaire = {
+        id: questionnaireId,
+        name: 'Questionário em Uso',
+      };
+
+      questionnaireRepositoryMock.findOne.mockResolvedValue(questionnaire);
+      evaluationRepositoryMock.count.mockResolvedValue(2);
+
+      await expect(
+        service.deleteQuestionnaire(questionnaireId),
+      ).rejects.toThrow(ConflictException);
+
+      expect(questionnaireRepositoryMock.remove).not.toHaveBeenCalled();
+    });
+
+    it('deve rejeitar a exclusão de questionário inexistente', async () => {
+      questionnaireRepositoryMock.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.deleteQuestionnaire(questionnaireId),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(evaluationRepositoryMock.count).not.toHaveBeenCalled();
+      expect(questionnaireRepositoryMock.remove).not.toHaveBeenCalled();
     });
   });
 

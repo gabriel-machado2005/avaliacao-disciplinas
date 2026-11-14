@@ -15,9 +15,15 @@ export default function QuestionnaireManagement() {
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [editingQuestionnaireId, setEditingQuestionnaireId] = useState<
+    string | null
+  >(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingQuestionnaireId, setDeletingQuestionnaireId] = useState<
+    string | null
+  >(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -68,6 +74,26 @@ export default function QuestionnaireManagement() {
     return () => controller.abort();
   }, []);
 
+  function handleEdit(questionnaire: Questionnaire) {
+    setEditingQuestionnaireId(questionnaire.id);
+    setName(questionnaire.name);
+    setDescription(questionnaire.description ?? "");
+
+    setError("");
+    setSuccess("");
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function handleCancelEdit() {
+    setEditingQuestionnaireId(null);
+    setName("");
+    setDescription("");
+
+    setError("");
+    setSuccess("");
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -81,6 +107,8 @@ export default function QuestionnaireManagement() {
       return;
     }
 
+    const isEditing = editingQuestionnaireId !== null;
+
     setSaving(true);
 
     try {
@@ -90,8 +118,12 @@ export default function QuestionnaireManagement() {
         throw new Error("Faça login novamente para continuar.");
       }
 
-      const response = await fetch("http://localhost:3000/questionnaires", {
-        method: "POST",
+      const url = isEditing
+        ? `http://localhost:3000/questionnaires/${editingQuestionnaireId}`
+        : "http://localhost:3000/questionnaires";
+
+      const response = await fetch(url, {
+        method: isEditing ? "PATCH" : "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -112,24 +144,120 @@ export default function QuestionnaireManagement() {
           : data.message;
 
         throw new Error(
-          message || "Não foi possível cadastrar o questionário.",
+          message ||
+            (isEditing
+              ? "Não foi possível atualizar o questionário."
+              : "Não foi possível cadastrar o questionário."),
         );
       }
 
-      const createdQuestionnaire: Questionnaire = await response.json();
+      const savedQuestionnaire: Questionnaire = await response.json();
 
-      setQuestionnaires((previous) => [...previous, createdQuestionnaire]);
+      setQuestionnaires((previous) =>
+        isEditing
+          ? previous.map((questionnaire) =>
+              questionnaire.id === savedQuestionnaire.id
+                ? savedQuestionnaire
+                : questionnaire,
+            )
+          : [...previous, savedQuestionnaire],
+      );
+
+      setSelectedQuestionnaire((current) =>
+        current?.id === savedQuestionnaire.id
+          ? { ...current, ...savedQuestionnaire }
+          : current,
+      );
 
       setName("");
       setDescription("");
+      setEditingQuestionnaireId(null);
 
-      setSuccess("Questionário cadastrado com sucesso!");
+      setSuccess(
+        isEditing
+          ? "Questionário atualizado com sucesso!"
+          : "Questionário cadastrado com sucesso!",
+      );
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Erro ao cadastrar questionário.",
+        err instanceof Error
+          ? err.message
+          : isEditing
+            ? "Erro ao atualizar questionário."
+            : "Erro ao cadastrar questionário.",
       );
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDelete(questionnaire: Questionnaire) {
+    if (saving || loading || deletingQuestionnaireId !== null) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Deseja realmente excluir o questionário "${questionnaire.name}"?\n\n` +
+        "As dimensões e perguntas também serão excluídas.\n" +
+        "Esta ação não poderá ser desfeita.",
+    );
+
+    if (!confirmed) return;
+
+    setError("");
+    setSuccess("");
+    setDeletingQuestionnaireId(questionnaire.id);
+
+    try {
+      const token = sessionStorage.getItem("accessToken");
+
+      if (!token) {
+        throw new Error("Faça login novamente para continuar.");
+      }
+
+      const response = await fetch(
+        `http://localhost:3000/questionnaires/${questionnaire.id}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      if (!response.ok) {
+        const data: { message?: string | string[] } = await response
+          .json()
+          .catch(() => ({}));
+
+        const message = Array.isArray(data.message)
+          ? data.message.join(" ")
+          : data.message;
+
+        throw new Error(message || "Não foi possível excluir o questionário.");
+      }
+
+      setQuestionnaires((previous) =>
+        previous.filter((item) => item.id !== questionnaire.id),
+      );
+
+      setSelectedQuestionnaire((current) =>
+        current?.id === questionnaire.id ? null : current,
+      );
+
+      if (editingQuestionnaireId === questionnaire.id) {
+        setEditingQuestionnaireId(null);
+        setName("");
+        setDescription("");
+      }
+
+      setSuccess("Questionário excluído com sucesso!");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Erro ao excluir questionário.",
+      );
+    } finally {
+      setDeletingQuestionnaireId(null);
     }
   }
 
@@ -142,7 +270,11 @@ export default function QuestionnaireManagement() {
         className="evaluation-card"
         style={{ display: "grid", gap: "12px" }}
       >
-        <h3>Cadastrar novo questionário</h3>
+        <h3>
+          {editingQuestionnaireId
+            ? "Editar questionário"
+            : "Cadastrar novo questionário"}
+        </h3>
 
         <label htmlFor="questionnaire-name">Nome do questionário</label>
 
@@ -169,8 +301,32 @@ export default function QuestionnaireManagement() {
         />
 
         <button type="submit" disabled={saving || loading}>
-          {saving ? "Cadastrando..." : "Cadastrar questionário"}
+          {saving
+            ? editingQuestionnaireId
+              ? "Salvando..."
+              : "Cadastrando..."
+            : editingQuestionnaireId
+              ? "Salvar alterações"
+              : "Cadastrar questionário"}
         </button>
+
+        {editingQuestionnaireId && (
+          <button
+            type="button"
+            onClick={handleCancelEdit}
+            disabled={saving}
+            style={{
+              backgroundColor: "#f3f4f6",
+              color: "#374151",
+              border: "1px solid #d1d5db",
+              borderRadius: "8px",
+              padding: "10px 16px",
+              fontWeight: 600,
+            }}
+          >
+            Cancelar edição
+          </button>
+        )}
       </form>
 
       {error && (
@@ -203,11 +359,48 @@ export default function QuestionnaireManagement() {
 
               <button
                 type="button"
+                onClick={() => handleEdit(questionnaire)}
+                disabled={saving || loading || deletingQuestionnaireId !== null}
+                style={{
+                  marginRight: "8px",
+                  backgroundColor: "#2563eb",
+                  color: "#ffffff",
+                  border: "1px solid #2563eb",
+                  borderRadius: "8px",
+                  padding: "10px 16px",
+                  fontWeight: 600,
+                }}
+              >
+                Editar
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void handleDelete(questionnaire)}
+                disabled={saving || loading || deletingQuestionnaireId !== null}
+                style={{
+                  marginRight: "8px",
+                  backgroundColor: "#b91c1c",
+                  color: "#ffffff",
+                  border: "1px solid #b91c1c",
+                  borderRadius: "8px",
+                  padding: "10px 16px",
+                  fontWeight: 600,
+                }}
+              >
+                {deletingQuestionnaireId === questionnaire.id
+                  ? "Excluindo..."
+                  : "Excluir"}
+              </button>
+
+              <button
+                type="button"
                 onClick={() =>
                   setSelectedQuestionnaire((current) =>
                     current?.id === questionnaire.id ? null : questionnaire,
                   )
                 }
+                disabled={saving || loading || deletingQuestionnaireId !== null}
               >
                 {selectedQuestionnaire?.id === questionnaire.id
                   ? "Fechar gerenciamento"

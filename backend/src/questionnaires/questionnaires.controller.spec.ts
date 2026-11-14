@@ -12,6 +12,8 @@ describe('QuestionnairesController', () => {
     createQuestionnaire: jest.fn(),
     findQuestionnaires: jest.fn(),
     findQuestionnaire: jest.fn(),
+    updateQuestionnaire: jest.fn(),
+    deleteQuestionnaire: jest.fn(),
     createDimension: jest.fn(),
     createQuestion: jest.fn(),
   };
@@ -120,6 +122,87 @@ describe('QuestionnairesController', () => {
 
       expect(result).toEqual(questionnaire);
     });
+  });
+
+  it('deve encaminhar a edição de um questionário', async () => {
+    const questionnaireId = 'questionnaire-id-1';
+
+    const dto = {
+      name: 'Questionário atualizado',
+      description: 'Nova descrição do questionário.',
+    };
+
+    const updatedQuestionnaire = {
+      id: questionnaireId,
+      ...dto,
+      active: true,
+    };
+
+    questionnairesServiceMock.updateQuestionnaire.mockResolvedValue(
+      updatedQuestionnaire,
+    );
+
+    const result = await controller.updateQuestionnaire(questionnaireId, dto);
+
+    expect(questionnairesServiceMock.updateQuestionnaire).toHaveBeenCalledWith(
+      questionnaireId,
+      dto,
+    );
+
+    expect(questionnairesServiceMock.updateQuestionnaire).toHaveBeenCalledTimes(
+      1,
+    );
+
+    expect(result).toEqual(updatedQuestionnaire);
+  });
+
+  it('deve permitir encaminhar apenas a descrição', async () => {
+    const questionnaireId = 'questionnaire-id-1';
+
+    const dto = {
+      description: 'Descrição alterada.',
+    };
+
+    const updatedQuestionnaire = {
+      id: questionnaireId,
+      name: 'Questionário original',
+      description: dto.description,
+    };
+
+    questionnairesServiceMock.updateQuestionnaire.mockResolvedValue(
+      updatedQuestionnaire,
+    );
+
+    const result = await controller.updateQuestionnaire(questionnaireId, dto);
+
+    expect(questionnairesServiceMock.updateQuestionnaire).toHaveBeenCalledWith(
+      questionnaireId,
+      dto,
+    );
+
+    expect(result).toEqual(updatedQuestionnaire);
+  });
+
+  it('deve encaminhar a exclusão de um questionário', async () => {
+    const questionnaireId = 'questionnaire-id-1';
+
+    const response = {
+      message: 'Questionário excluído com sucesso.',
+    };
+
+    questionnairesServiceMock.deleteQuestionnaire.mockResolvedValue(response);
+
+    const result = await controller.deleteQuestionnaire(questionnaireId);
+
+    expect(questionnairesServiceMock.deleteQuestionnaire).toHaveBeenCalledWith(
+      questionnaireId,
+    );
+
+    expect(questionnairesServiceMock.deleteQuestionnaire).toHaveBeenCalledTimes(
+      1,
+    );
+
+    expect(result).toEqual(response);
   });
 
   describe('Dimensões', () => {

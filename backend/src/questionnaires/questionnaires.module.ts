@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { Evaluation } from '../evaluations/entities/evaluation.entity';
 import { Dimension } from './entities/dimension.entity';
 import { Question } from './entities/question.entity';
 import { Questionnaire } from './entities/questionnaire.entity';
@@ -9,11 +10,7 @@ import { QuestionnairesService } from './questionnaires.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
-      Questionnaire,
-      Dimension,
-      Question,
-    ]),
+    TypeOrmModule.forFeature([Questionnaire, Dimension, Question, Evaluation]),
 
     PassportModule.register({
       defaultStrategy: 'jwt',
