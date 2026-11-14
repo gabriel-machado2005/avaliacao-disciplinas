@@ -43,16 +43,19 @@ A plataforma possui quatro perfis de acesso.
 - Criação de avaliações para as turmas.
 - Habilitação de estudantes.
 - Consulta dos resultados consolidados.
+- Exportação dos resultados consolidados das avaliações em formato CSV.
 
 ### Coordenador
 
 - Acesso às funcionalidades acadêmicas e de gerenciamento de avaliações permitidas ao perfil.
 - Consulta de resultados consolidados.
+- Exportação dos resultados consolidados das avaliações em formato CSV.
 
 ### Professor
 
 - Consulta das avaliações vinculadas às suas turmas.
 - Visualização dos resultados das avaliações autorizadas.
+- Exportação dos resultados consolidados de suas turmas em formato CSV, respeitando as regras de divulgação.
 
 ### Estudante
 
@@ -71,6 +74,16 @@ Os questionários são organizados em dimensões e permitem três tipos de pergu
 - **Resposta aberta:** preenchimento de um campo de texto.
 
 As perguntas podem ser configuradas como obrigatórias ou opcionais.
+
+## Exportação de relatórios
+
+A plataforma permite exportar os resultados consolidados de avaliações em formato CSV, compatível com ferramentas de planilhas.
+
+O relatório inclui informações da disciplina, turma, semestre, participação dos estudantes, dimensões, perguntas, médias e distribuições das respostas.
+
+A exportação utiliza os resultados autorizados pelo backend, respeitando as regras de acesso, encerramento do período e quantidade mínima de respostas.
+
+Os comentários discursivos individuais e os identificadores dos estudantes não são incluídos no arquivo exportado.
 
 ## Regras de negócio
 
@@ -237,6 +250,18 @@ O backend utiliza, na configuração local de desenvolvimento, o endereço:
 http://localhost:3000
 ```
 
+### Documentação da API
+
+O backend disponibiliza documentação interativa utilizando Swagger/OpenAPI.
+
+Com o servidor em execução no ambiente de desenvolvimento, acesse:
+
+http://localhost:3000/api/docs
+
+A interface permite consultar os endpoints disponíveis, seus parâmetros e os esquemas documentados da API.
+
+A documentação foi configurada para não ser disponibilizada quando `NODE_ENV=production`.
+
 ### Frontend
 
 Em outro terminal, aberto na pasta principal do projeto, instale as dependências do frontend:
@@ -280,8 +305,8 @@ npm --prefix backend test -- --runInBand
 Resultado registrado durante a validação do projeto:
 
 ```text
-Test Suites: 11 passed, 11 total
-Tests:       131 passed, 131 total
+Test Suites: 12 passed, 12 total
+Tests:       263 passed, 263 total
 ```
 
 Os testes unitários utilizam dependências simuladas para verificar os comportamentos dos serviços e controllers.
@@ -313,3 +338,82 @@ O sistema também separa o registro de conclusão da avaliação do armazenament
 ## Sobre o projeto
 
 Projeto acadêmico desenvolvido durante o estágio supervisionado em Ciência da Computação, com o objetivo de aplicar conhecimentos de desenvolvimento web, APIs REST, modelagem de dados, autenticação, testes automatizados e versionamento de código.
+
+## Backup e recuperação do banco de dados
+
+O projeto utiliza PostgreSQL e permite realizar backups por meio das ferramentas oficiais `pg_dump` e `pg_restore`.
+
+### Criar um backup
+
+Em ambiente Windows com PostgreSQL 18, execute no PowerShell:
+
+```powershell
+$backupDir = "C:\Projetos\backups-avaliacao-disciplinas"
+
+New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
+
+$backupFile = Join-Path $backupDir (
+    "avaliacao_disciplinas_" +
+    (Get-Date -Format "yyyyMMdd_HHmmss") +
+    ".backup"
+)
+
+& "C:\Program Files\PostgreSQL\18\bin\pg_dump.exe" `
+    -h localhost `
+    -p 5432 `
+    -U postgres `
+    -d avaliacao_disciplinas `
+    -F c `
+    --no-owner `
+    --no-acl `
+    -W `
+    -f $backupFile
+```
+
+A ferramenta solicitará a senha do usuário PostgreSQL.
+
+O arquivo gerado utiliza o formato personalizado do PostgreSQL (`.backup`).
+
+### Verificar o arquivo
+
+Para listar os objetos armazenados no backup:
+
+```powershell
+& "C:\Program Files\PostgreSQL\18\bin\pg_restore.exe" `
+    --list `
+    "CAMINHO_DO_ARQUIVO.backup"
+```
+
+Para verificar a leitura completa e a geração da representação SQL:
+
+```powershell
+& "C:\Program Files\PostgreSQL\18\bin\pg_restore.exe" `
+    --file=NUL `
+    "CAMINHO_DO_ARQUIVO.backup"
+```
+
+O código de saída `0` indica que o processamento terminou sem erros detectados.
+
+### Recuperação dos dados
+
+A recuperação deve ser realizada inicialmente em um banco de dados de teste, separado do banco original.
+
+O procedimento consiste em:
+
+1. Criar um banco de dados PostgreSQL vazio para restauração.
+2. Utilizar `pg_restore` apontando para esse banco de teste.
+3. Conferir a existência das tabelas, relacionamentos e registros.
+4. Verificar o funcionamento da aplicação com os dados recuperados.
+
+A leitura do arquivo não substitui uma restauração completa de teste.
+
+### Cuidados de segurança
+
+- Nunca enviar arquivos de backup ao GitHub.
+- Não armazenar senhas nos comandos ou na documentação.
+- Manter os backups em local protegido, com acesso restrito.
+- Preservar cópias adicionais em armazenamento seguro.
+- Testar periodicamente a recuperação dos dados.
+- Não restaurar backups diretamente sobre o banco em uso sem planejamento prévio.
+
+Durante o desenvolvimento, foi criado e verificado um backup do banco `avaliacao_disciplinas` utilizando PostgreSQL 18.6.
