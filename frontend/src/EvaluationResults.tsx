@@ -46,6 +46,96 @@ type Props = {
   onBack: () => void;
 };
 
+function exportEvaluationResultsCsv(results: EvaluationResult) {
+  const headers = [
+    "Disciplina",
+    "Código",
+    "Turma",
+    "Semestre",
+    "Estudantes habilitados",
+    "Respostas recebidas",
+    "Taxa de participação (%)",
+    "Dimensão",
+    "Pergunta",
+    "Tipo",
+    "Respostas da pergunta",
+    "Média",
+    "Distribuição",
+  ];
+
+  const rows: (string | number)[][] = [];
+
+  for (const dimension of results.dimensions) {
+    for (const question of dimension.questions) {
+      const average =
+        question.type === "SCALE" && question.average !== null
+          ? question.average.toLocaleString("pt-BR")
+          : "";
+
+      const distribution =
+        question.type === "TEXT"
+          ? ""
+          : Object.entries(question.distribution)
+              .map(([option, count]) => `${option}: ${count}`)
+              .join(" | ");
+
+      rows.push([
+        results.evaluation.discipline.name,
+        results.evaluation.discipline.code,
+        results.evaluation.classGroup,
+        results.evaluation.academicTerm,
+        results.participation.eligible,
+        results.participation.responses,
+        results.participation.rate.toLocaleString("pt-BR"),
+        dimension.name,
+        question.text,
+        question.type,
+        question.responses,
+        average,
+        distribution,
+      ]);
+    }
+  }
+
+  function formatCell(value: string | number) {
+    let text = String(value);
+
+    // Evita que textos sejam interpretados como fórmulas no Excel.
+    if (/^\s*[=+\-@]/.test(text)) {
+      text = "'" + text;
+    }
+
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+
+  const csv = [headers, ...rows]
+    .map((row) => row.map(formatCell).join(";"))
+    .join("\r\n");
+
+  const blob = new Blob(["\uFEFF", csv], {
+    type: "text/csv;charset=utf-8;",
+  });
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  const filename = [
+    results.evaluation.discipline.code,
+    results.evaluation.academicTerm,
+  ]
+    .join("_")
+    .replace(/[^a-zA-Z0-9_-]/g, "_");
+
+  link.href = url;
+  link.download = `relatorio_${filename}.csv`;
+
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export default function EvaluationResults({ evaluationId, onBack }: Props) {
   const [results, setResults] = useState<EvaluationResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -112,6 +202,16 @@ export default function EvaluationResults({ evaluationId, onBack }: Props) {
       </button>
 
       <h2>Resultados da avaliação</h2>
+
+      {results && (
+        <button
+          type="button"
+          onClick={() => exportEvaluationResultsCsv(results)}
+          style={{ marginBottom: "20px" }}
+        >
+          Exportar relatório (CSV)
+        </button>
+      )}
 
       {loading && <p>Carregando resultados...</p>}
 
