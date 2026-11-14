@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ProfessorEvaluations from "./ProfessorEvaluations";
 import AcademicCourses from "./AcademicCourses";
 import AcademicDisciplines from "./AcademicDisciplines";
@@ -23,8 +23,36 @@ type Section =
   | "questionnaires"
   | "eligibilities";
 
+const VALID_SECTIONS: Section[] = [
+  "evaluations",
+  "courses",
+  "disciplines",
+  "terms",
+  "classes",
+  "periods",
+  "questionnaires",
+  "eligibilities",
+];
+
 export default function AdministrativePanel({ role }: Props) {
-  const [activeSection, setActiveSection] = useState<Section>("evaluations");
+  const [activeSection, setActiveSection] = useState<Section>(() => {
+    const savedSection = sessionStorage.getItem(
+      `administrative-panel-section:${role}`,
+    );
+
+    return (
+      VALID_SECTIONS.find((section) => section === savedSection) ??
+      "evaluations"
+    );
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem(
+      `administrative-panel-section:${role}`,
+      activeSection,
+    );
+  }, [activeSection, role]);
+
   const [evaluationsRefreshKey, setEvaluationsRefreshKey] = useState(0);
 
   return (
