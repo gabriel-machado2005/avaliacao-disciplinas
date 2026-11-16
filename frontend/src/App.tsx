@@ -271,7 +271,10 @@ function App() {
               : "Painel do coordenador"}
           </h2>
 
-          <p>Consulte as avaliações e seus resultados consolidados.</p>
+          <p>
+            Gerencie avaliações, questionários e a estrutura acadêmica da
+            plataforma.
+          </p>
 
           <AdministrativePanel role={loggedInUser.role} />
 
