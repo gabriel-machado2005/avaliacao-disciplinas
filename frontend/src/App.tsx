@@ -296,7 +296,7 @@ function App() {
 
           <h2>Minhas avaliações</h2>
           {questionnaireError && (
-            <p role="alert" style={{ color: "#dc2626" }}>
+            <p role="alert" className="ui-feedback ui-feedback--error">
               {questionnaireError}
             </p>
           )}
@@ -306,7 +306,9 @@ function App() {
           ) : evaluationsLoading ? (
             <p>Carregando avaliações...</p>
           ) : evaluationsError ? (
-            <p style={{ color: "#dc2626" }}>{evaluationsError}</p>
+            <p role="alert" className="ui-feedback ui-feedback--error">
+              {evaluationsError}
+            </p>
           ) : evaluations.length === 0 ? (
             <p>Nenhuma avaliação encontrada para este estudante.</p>
           ) : (
@@ -334,12 +336,21 @@ function App() {
                         : "Disponível para responder";
 
                 return (
-                  <li key={item.id} className="evaluation-card">
-                    <strong>{classGroup.discipline.name}</strong>
+                  <li key={item.id} className="evaluation-card ui-card">
+                    <h4 className="ui-card__title">
+                      {classGroup.discipline.name}
+                    </h4>
 
-                    <p>Turma: {classGroup.code}</p>
-                    <p>Período: {item.evaluation.evaluationPeriod.name}</p>
-                    <p>Professor: {classGroup.professor.name}</p>
+                    <p className="ui-card__meta">Turma: {classGroup.code}</p>
+
+                    <p className="ui-card__meta">
+                      Período: {item.evaluation.evaluationPeriod.name}
+                    </p>
+
+                    <p className="ui-card__meta">
+                      Professor: {classGroup.professor.name}
+                    </p>
+
                     <p
                       className={`evaluation-status ${
                         item.completed
@@ -351,18 +362,22 @@ function App() {
                     >
                       Situação: {status}
                     </p>
+
                     {canRespond && (
-                      <button
-                        type="button"
-                        disabled={questionnaireLoading}
-                        onClick={() =>
-                          handleOpenQuestionnaire(item.evaluation.id)
-                        }
-                      >
-                        {questionnaireLoading
-                          ? "Abrindo..."
-                          : "Responder avaliação"}
-                      </button>
+                      <div className="ui-card__actions">
+                        <button
+                          type="button"
+                          className="ui-btn ui-btn--primary"
+                          disabled={questionnaireLoading}
+                          onClick={() =>
+                            handleOpenQuestionnaire(item.evaluation.id)
+                          }
+                        >
+                          {questionnaireLoading
+                            ? "Abrindo..."
+                            : "Responder avaliação"}
+                        </button>
+                      </div>
                     )}
                   </li>
                 );

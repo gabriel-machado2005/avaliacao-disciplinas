@@ -1350,6 +1350,102 @@ describe('EvaluationsService', () => {
     });
   });
 
+  describe('Revogação de habilitação de estudantes', () => {
+    const eligibilityId = 'eligibility-id-1';
+
+    const transactionEligibilityRepositoryMock = {
+      findOne: jest.fn(),
+      delete: jest.fn(),
+    };
+
+    const transactionManagerMock = {
+      getRepository: jest.fn(),
+    };
+
+    beforeEach(() => {
+      transactionManagerMock.getRepository.mockImplementation(
+        (entity: unknown) => {
+          if (entity === EvaluationEligibility) {
+            return transactionEligibilityRepositoryMock;
+          }
+
+          throw new Error('Repositório não esperado no teste.');
+        },
+      );
+
+      dataSourceMock.transaction.mockImplementation(
+        async (
+          operation: (
+            manager: typeof transactionManagerMock,
+          ) => Promise<unknown>,
+        ) => operation(transactionManagerMock),
+      );
+    });
+
+    it('deve remover a habilitação de um estudante pendente', async () => {
+      transactionEligibilityRepositoryMock.findOne.mockResolvedValue({
+        id: eligibilityId,
+        completed: false,
+      });
+
+      transactionEligibilityRepositoryMock.delete.mockResolvedValue({
+        affected: 1,
+      });
+
+      const result = await service.revokeEligibility(eligibilityId);
+
+      expect(dataSourceMock.transaction).toHaveBeenCalledTimes(1);
+
+      expect(transactionManagerMock.getRepository).toHaveBeenCalledWith(
+        EvaluationEligibility,
+      );
+
+      expect(transactionEligibilityRepositoryMock.findOne).toHaveBeenCalledWith(
+        {
+          where: { id: eligibilityId },
+          lock: {
+            mode: 'pessimistic_write',
+          },
+        },
+      );
+
+      expect(transactionEligibilityRepositoryMock.delete).toHaveBeenCalledWith(
+        eligibilityId,
+      );
+
+      expect(result).toEqual({
+        message: 'Habilitação do estudante removida com sucesso.',
+      });
+    });
+
+    it('deve impedir desabilitar um estudante que já respondeu', async () => {
+      transactionEligibilityRepositoryMock.findOne.mockResolvedValue({
+        id: eligibilityId,
+        completed: true,
+      });
+
+      await expect(service.revokeEligibility(eligibilityId)).rejects.toThrow(
+        ConflictException,
+      );
+
+      expect(
+        transactionEligibilityRepositoryMock.delete,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('deve rejeitar uma habilitação inexistente', async () => {
+      transactionEligibilityRepositoryMock.findOne.mockResolvedValue(null);
+
+      await expect(service.revokeEligibility(eligibilityId)).rejects.toThrow(
+        NotFoundException,
+      );
+
+      expect(
+        transactionEligibilityRepositoryMock.delete,
+      ).not.toHaveBeenCalled();
+    });
+  });
+
   describe('Avaliações do estudante', () => {
     const studentId = 'student-id-1';
 

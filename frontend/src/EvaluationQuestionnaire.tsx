@@ -129,24 +129,33 @@ export default function EvaluationQuestionnaire({ data, onBack }: Props) {
 
   if (submitted) {
     return (
-      <div>
+      <div className="evaluation-card ui-card">
         <h2>Avaliação enviada!</h2>
-        <p>Suas respostas foram registradas com sucesso.</p>
 
-        <button type="button" onClick={onBack}>
-          Voltar às avaliações
-        </button>
+        <p className="ui-feedback ui-feedback--success" role="status">
+          Suas respostas foram registradas com sucesso.
+        </p>
+
+        <div className="ui-card__actions">
+          <button
+            type="button"
+            className="ui-btn ui-btn--primary"
+            onClick={onBack}
+          >
+            Voltar às avaliações
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} className="ui-form">
       <h2>{data.questionnaire.name}</h2>
 
       {data.questionnaire.dimensions.map((dimension) => (
-        <section key={dimension.id}>
-          <h3>{dimension.name}</h3>
+        <section key={dimension.id} className="evaluation-card ui-card">
+          <h3 className="ui-card__title">{dimension.name}</h3>
 
           {dimension.questions.map((question) => (
             <div key={question.id} className="form-group">
@@ -218,12 +227,7 @@ export default function EvaluationQuestionnaire({ data, onBack }: Props) {
 
                   <p
                     id={`privacy-${question.id}`}
-                    style={{
-                      fontSize: "12px",
-                      color: "#64748b",
-                      marginTop: "6px",
-                      lineHeight: "1.5",
-                    }}
+                    className="questionnaire-privacy-note"
                   >
                     Para preservar seu anonimato, evite informar nomes, dados
                     pessoais ou situações que possam identificar você ou outras
@@ -237,18 +241,29 @@ export default function EvaluationQuestionnaire({ data, onBack }: Props) {
       ))}
 
       {error && (
-        <p role="alert" style={{ color: "#dc2626" }}>
+        <p role="alert" className="ui-feedback ui-feedback--error">
           {error}
         </p>
       )}
 
-      <button type="submit" disabled={submitting}>
-        {submitting ? "Enviando..." : "Enviar avaliação"}
-      </button>
+      <div className="ui-form__actions">
+        <button
+          type="submit"
+          className="ui-btn ui-btn--primary"
+          disabled={submitting || submitted}
+        >
+          {submitting ? "Enviando..." : "Enviar avaliação"}
+        </button>
 
-      <button type="button" onClick={onBack} disabled={submitting}>
-        Voltar às avaliações
-      </button>
+        <button
+          type="button"
+          className="ui-btn ui-btn--secondary"
+          onClick={onBack}
+          disabled={submitting}
+        >
+          Voltar às avaliações
+        </button>
+      </div>
     </form>
   );
 }

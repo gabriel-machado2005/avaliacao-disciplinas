@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import QuestionnaireDimensions from "./QuestionnaireDimensions";
 
 type Questionnaire = {
@@ -9,9 +9,11 @@ type Questionnaire = {
 };
 
 export default function QuestionnaireManagement() {
+  const formRef = useRef<HTMLFormElement>(null);
   const [questionnaires, setQuestionnaires] = useState<Questionnaire[]>([]);
   const [selectedQuestionnaire, setSelectedQuestionnaire] =
     useState<Questionnaire | null>(null);
+  const [questionnaireToManageId, setQuestionnaireToManageId] = useState("");
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -82,7 +84,10 @@ export default function QuestionnaireManagement() {
     setError("");
     setSuccess("");
 
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    formRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
   }
 
   function handleCancelEdit() {
@@ -245,6 +250,10 @@ export default function QuestionnaireManagement() {
         current?.id === questionnaire.id ? null : current,
       );
 
+      setQuestionnaireToManageId((current) =>
+        current === questionnaire.id ? "" : current,
+      );
+
       if (editingQuestionnaireId === questionnaire.id) {
         setEditingQuestionnaireId(null);
         setName("");
@@ -266,9 +275,9 @@ export default function QuestionnaireManagement() {
       <h2>Gerenciamento de questionários</h2>
 
       <form
+        ref={formRef}
         onSubmit={handleSubmit}
-        className="evaluation-card"
-        style={{ display: "grid", gap: "12px" }}
+        className="evaluation-card ui-form"
       >
         <h3>
           {editingQuestionnaireId
@@ -300,33 +309,32 @@ export default function QuestionnaireManagement() {
           disabled={saving}
         />
 
-        <button type="submit" disabled={saving || loading}>
-          {saving
-            ? editingQuestionnaireId
-              ? "Salvando..."
-              : "Cadastrando..."
-            : editingQuestionnaireId
-              ? "Salvar alterações"
-              : "Cadastrar questionário"}
-        </button>
-
-        {editingQuestionnaireId && (
+        <div className="ui-form__actions">
           <button
-            type="button"
-            onClick={handleCancelEdit}
-            disabled={saving}
-            style={{
-              backgroundColor: "#f3f4f6",
-              color: "#374151",
-              border: "1px solid #d1d5db",
-              borderRadius: "8px",
-              padding: "10px 16px",
-              fontWeight: 600,
-            }}
+            type="submit"
+            className="ui-btn ui-btn--primary"
+            disabled={saving || loading}
           >
-            Cancelar edição
+            {saving
+              ? editingQuestionnaireId
+                ? "Salvando..."
+                : "Cadastrando..."
+              : editingQuestionnaireId
+                ? "Salvar alterações"
+                : "Cadastrar questionário"}
           </button>
-        )}
+
+          {editingQuestionnaireId && (
+            <button
+              type="button"
+              className="ui-btn ui-btn--secondary"
+              onClick={handleCancelEdit}
+              disabled={saving}
+            >
+              Cancelar edição
+            </button>
+          )}
+        </div>
       </form>
 
       {error && (
@@ -350,65 +358,120 @@ export default function QuestionnaireManagement() {
       ) : (
         <ul className="evaluation-list">
           {questionnaires.map((questionnaire) => (
-            <li key={questionnaire.id} className="evaluation-card">
-              <strong>{questionnaire.name}</strong>
+            <li
+              key={questionnaire.id}
+              className="evaluation-card questionnaire-card"
+            >
+              <div className="questionnaire-card__header">
+                <h4 className="questionnaire-card__name">
+                  {questionnaire.name}
+                </h4>
 
-              {questionnaire.description && <p>{questionnaire.description}</p>}
+                <span
+                  className={`questionnaire-card__status ${
+                    questionnaire.active
+                      ? "questionnaire-card__status--active"
+                      : "questionnaire-card__status--inactive"
+                  }`}
+                >
+                  {questionnaire.active ? "Ativo" : "Inativo"}
+                </span>
+              </div>
 
-              <p>Situação: {questionnaire.active ? "Ativo" : "Inativo"}</p>
+              {questionnaire.description && (
+                <p className="questionnaire-card__description">
+                  {questionnaire.description}
+                </p>
+              )}
 
-              <button
-                type="button"
-                onClick={() => handleEdit(questionnaire)}
-                disabled={saving || loading || deletingQuestionnaireId !== null}
-                style={{
-                  marginRight: "8px",
-                  backgroundColor: "#2563eb",
-                  color: "#ffffff",
-                  border: "1px solid #2563eb",
-                  borderRadius: "8px",
-                  padding: "10px 16px",
-                  fontWeight: 600,
-                }}
-              >
-                Editar
-              </button>
+              <div className="questionnaire-card__actions">
+                <button
+                  type="button"
+                  className="questionnaire-card__action questionnaire-card__action--primary"
+                  onClick={() => handleEdit(questionnaire)}
+                  disabled={
+                    saving || loading || deletingQuestionnaireId !== null
+                  }
+                >
+                  Editar
+                </button>
 
-              <button
-                type="button"
-                onClick={() => void handleDelete(questionnaire)}
-                disabled={saving || loading || deletingQuestionnaireId !== null}
-                style={{
-                  marginRight: "8px",
-                  backgroundColor: "#b91c1c",
-                  color: "#ffffff",
-                  border: "1px solid #b91c1c",
-                  borderRadius: "8px",
-                  padding: "10px 16px",
-                  fontWeight: 600,
-                }}
-              >
-                {deletingQuestionnaireId === questionnaire.id
-                  ? "Excluindo..."
-                  : "Excluir"}
-              </button>
-
-              <button
-                type="button"
-                onClick={() =>
-                  setSelectedQuestionnaire((current) =>
-                    current?.id === questionnaire.id ? null : questionnaire,
-                  )
-                }
-                disabled={saving || loading || deletingQuestionnaireId !== null}
-              >
-                {selectedQuestionnaire?.id === questionnaire.id
-                  ? "Fechar gerenciamento"
-                  : "Gerenciar dimensões"}
-              </button>
+                <button
+                  type="button"
+                  className="questionnaire-card__action questionnaire-card__action--danger"
+                  onClick={() => void handleDelete(questionnaire)}
+                  disabled={
+                    saving || loading || deletingQuestionnaireId !== null
+                  }
+                >
+                  {deletingQuestionnaireId === questionnaire.id
+                    ? "Excluindo..."
+                    : "Excluir"}
+                </button>
+              </div>
             </li>
           ))}
         </ul>
+      )}
+
+      {!loading && questionnaires.length > 0 && (
+        <div className="evaluation-card ui-card questionnaire-manage">
+          <h3>Gerenciar dimensões</h3>
+
+          <p>
+            Selecione um questionário para gerenciar suas dimensões e perguntas.
+          </p>
+
+          <div className="questionnaire-manage__controls">
+            <div className="questionnaire-manage__field">
+              <label htmlFor="questionnaire-manage-select">Questionário</label>
+
+              <select
+                id="questionnaire-manage-select"
+                className="questionnaire-manage__select"
+                value={questionnaireToManageId}
+                onChange={(event) => {
+                  setQuestionnaireToManageId(event.target.value);
+                  setSelectedQuestionnaire(null);
+                }}
+                disabled={saving || deletingQuestionnaireId !== null}
+              >
+                <option value="">Selecione um questionário</option>
+
+                {questionnaires.map((questionnaire) => (
+                  <option key={questionnaire.id} value={questionnaire.id}>
+                    {questionnaire.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              type="button"
+              className="ui-btn ui-btn--primary"
+              disabled={
+                !questionnaireToManageId ||
+                saving ||
+                deletingQuestionnaireId !== null
+              }
+              onClick={() => {
+                const questionnaire = questionnaires.find(
+                  (item) => item.id === questionnaireToManageId,
+                );
+
+                if (!questionnaire) return;
+
+                setSelectedQuestionnaire((current) =>
+                  current?.id === questionnaire.id ? null : questionnaire,
+                );
+              }}
+            >
+              {selectedQuestionnaire?.id === questionnaireToManageId
+                ? "Fechar gerenciamento"
+                : "Gerenciar dimensões"}
+            </button>
+          </div>
+        </div>
       )}
 
       {selectedQuestionnaire && (

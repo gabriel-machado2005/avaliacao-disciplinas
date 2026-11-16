@@ -88,6 +88,13 @@ export class EvaluationsController {
     return this.evaluationsService.createEligibility(dto);
   }
 
+  @Delete('eligibilities/:eligibilityId')
+  revokeEligibility(
+    @Param('eligibilityId', ParseUUIDPipe) eligibilityId: string,
+  ) {
+    return this.evaluationsService.revokeEligibility(eligibilityId);
+  }
+
   @Get(':evaluationId/eligibilities')
   findEligibilities(@Param('evaluationId') evaluationId: string) {
     return this.evaluationsService.findEligibilities(evaluationId);

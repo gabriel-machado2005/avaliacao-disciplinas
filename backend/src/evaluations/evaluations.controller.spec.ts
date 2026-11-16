@@ -4,6 +4,8 @@ import { RolesGuard } from '../auth/roles.guard';
 import { EvaluationsController } from './evaluations.controller';
 import { EvaluationsService } from './evaluations.service';
 import { UserRole } from '../users/entities/user.entity';
+import { Reflector } from '@nestjs/core';
+import { ROLES_KEY } from '../auth/roles.decorator';
 
 describe('EvaluationsController', () => {
   let controller: EvaluationsController;
@@ -19,6 +21,7 @@ describe('EvaluationsController', () => {
     findEvaluations: jest.fn(),
     findProfessorEvaluations: jest.fn(),
     createEligibility: jest.fn(),
+    revokeEligibility: jest.fn(),
     findEligibilities: jest.fn(),
     findMyEvaluations: jest.fn(),
     findQuestionnaireForStudent: jest.fn(),
@@ -295,6 +298,40 @@ describe('EvaluationsController', () => {
       expect(evaluationsServiceMock.createEligibility).toHaveBeenCalledTimes(1);
 
       expect(result).toEqual(eligibility);
+    });
+
+    it('deve encaminhar a desabilitação de um estudante', async () => {
+      const eligibilityId = 'eligibility-id-1';
+
+      const response = {
+        message: 'Habilitação do estudante removida com sucesso.',
+      };
+
+      evaluationsServiceMock.revokeEligibility.mockResolvedValue(response);
+
+      const result = await controller.revokeEligibility(eligibilityId);
+
+      expect(evaluationsServiceMock.revokeEligibility).toHaveBeenCalledWith(
+        eligibilityId,
+      );
+
+      expect(evaluationsServiceMock.revokeEligibility).toHaveBeenCalledTimes(1);
+
+      expect(result).toEqual(response);
+    });
+
+    it('deve restringir a desabilitação aos administradores e coordenadores', () => {
+      const reflector = new Reflector();
+
+      const allowedRoles = reflector.getAllAndOverride<UserRole[]>(ROLES_KEY, [
+        controller.revokeEligibility,
+        EvaluationsController,
+      ]);
+
+      expect(allowedRoles).toEqual([UserRole.ADMIN, UserRole.COORDINATOR]);
+
+      expect(allowedRoles).not.toContain(UserRole.PROFESSOR);
+      expect(allowedRoles).not.toContain(UserRole.STUDENT);
     });
 
     it('deve consultar as elegibilidades de uma avaliação', async () => {

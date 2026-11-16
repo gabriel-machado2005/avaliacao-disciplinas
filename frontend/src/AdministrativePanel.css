@@ -135,3 +135,44 @@
         transform: none;
     }
 }
+/* Controle de exibicao do menu administrativo */
+
+.admin-menu__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 20px 0;
+    padding: 14px 16px;
+    background-color: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    color: #475569;
+    font-size: 14px;
+}
+
+.admin-menu__toolbar strong {
+    color: #1e293b;
+}
+
+.login-card .admin-menu__toggle {
+    width: auto;
+    padding: 9px 14px;
+    background-color: #ffffff;
+    color: #2563eb;
+    border: 1px solid #bfdbfe;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.login-card .admin-menu__toggle:hover {
+    background-color: #eff6ff;
+}
+
+.login-card .admin-menu__toggle:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+}

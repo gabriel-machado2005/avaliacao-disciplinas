@@ -646,6 +646,37 @@ export class EvaluationsService {
     }));
   }
 
+  async revokeEligibility(eligibilityId: string) {
+    return this.dataSource.transaction(async (manager) => {
+      const eligibilityRepository = manager.getRepository(
+        EvaluationEligibility,
+      );
+
+      const eligibility = await eligibilityRepository.findOne({
+        where: { id: eligibilityId },
+        lock: {
+          mode: 'pessimistic_write',
+        },
+      });
+
+      if (!eligibility) {
+        throw new NotFoundException('Habilitação não encontrada.');
+      }
+
+      if (eligibility.completed) {
+        throw new ConflictException(
+          'Não é possível desabilitar um estudante que já respondeu esta avaliação.',
+        );
+      }
+
+      await eligibilityRepository.delete(eligibility.id);
+
+      return {
+        message: 'Habilitação do estudante removida com sucesso.',
+      };
+    });
+  }
+
   async findMyEvaluations(studentId: string) {
     return this.evaluationEligibilityRepository.find({
       where: {

@@ -162,14 +162,7 @@ export default function QuestionnaireQuestions({
         Dimensão: <strong>{dimensionName}</strong>
       </p>
 
-      <form
-        onSubmit={handleSubmit}
-        className="evaluation-card"
-        style={{
-          display: "grid",
-          gap: "12px",
-        }}
-      >
+      <form onSubmit={handleSubmit} className="evaluation-card ui-form">
         <h3>Adicionar nova pergunta</h3>
 
         <label htmlFor="question-text">Enunciado da pergunta</label>
@@ -262,29 +255,35 @@ export default function QuestionnaireQuestions({
           disabled={saving}
         />
 
-        <label>
+        <label className="ui-checkbox">
           <input
             type="checkbox"
             checked={required}
             onChange={(event) => setRequired(event.target.checked)}
             disabled={saving}
           />
-          Pergunta obrigatória
+          <span>Pergunta obrigatória</span>
         </label>
 
-        <button type="submit" disabled={saving}>
-          {saving ? "Cadastrando..." : "Adicionar pergunta"}
-        </button>
+        <div className="ui-form__actions">
+          <button
+            type="submit"
+            className="ui-btn ui-btn--primary"
+            disabled={saving}
+          >
+            {saving ? "Cadastrando..." : "Adicionar pergunta"}
+          </button>
+        </div>
       </form>
 
       {error && (
-        <p role="alert" style={{ color: "#dc2626" }}>
+        <p role="alert" className="ui-feedback ui-feedback--error">
           {error}
         </p>
       )}
 
       {success && (
-        <p role="status" style={{ color: "#15803d" }}>
+        <p role="status" className="ui-feedback ui-feedback--success">
           {success}
         </p>
       )}

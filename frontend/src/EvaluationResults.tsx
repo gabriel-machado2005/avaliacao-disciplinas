@@ -197,20 +197,26 @@ export default function EvaluationResults({ evaluationId, onBack }: Props) {
 
   return (
     <section>
-      <button type="button" onClick={onBack}>
+      <button
+        type="button"
+        className="ui-btn ui-btn--secondary"
+        onClick={onBack}
+      >
         Voltar para avaliações
       </button>
 
       <h2>Resultados da avaliação</h2>
 
       {results && (
-        <button
-          type="button"
-          onClick={() => exportEvaluationResultsCsv(results)}
-          style={{ marginBottom: "20px" }}
-        >
-          Exportar relatório (CSV)
-        </button>
+        <div className="ui-card__actions">
+          <button
+            type="button"
+            className="ui-btn ui-btn--primary"
+            onClick={() => exportEvaluationResultsCsv(results)}
+          >
+            Exportar relatório (CSV)
+          </button>
+        </div>
       )}
 
       {loading && <p>Carregando resultados...</p>}
@@ -224,23 +230,35 @@ export default function EvaluationResults({ evaluationId, onBack }: Props) {
           <p>Turma: {results.evaluation.classGroup}</p>
           <p>Semestre: {results.evaluation.academicTerm}</p>
 
-          <div className="evaluation-card">
-            <h3>Participação</h3>
+          <div className="evaluation-card ui-card">
+            <h3 className="ui-card__title">Participação</h3>
 
-            <p>Estudantes habilitados: {results.participation.eligible}</p>
-            <p>Respostas recebidas: {results.participation.responses}</p>
-            <p>Taxa de participação: {results.participation.rate}%</p>
+            <p className="ui-card__meta">
+              Estudantes habilitados: {results.participation.eligible}
+            </p>
+
+            <p className="ui-card__meta">
+              Respostas recebidas: {results.participation.responses}
+            </p>
+
+            <p className="ui-card__meta">
+              Taxa de participação: {results.participation.rate}%
+            </p>
           </div>
 
           {results.dimensions.map((dimension) => (
-            <section key={dimension.id}>
-              <h3>{dimension.name}</h3>
+            <section key={dimension.id} className="results-dimension">
+              <h3 className="ui-card__title results-dimension__title">
+                {dimension.name}
+              </h3>
 
               {dimension.questions.map((question) => (
-                <div key={question.id} className="evaluation-card">
-                  <h4>{question.text}</h4>
+                <div key={question.id} className="evaluation-card ui-card">
+                  <h4 className="ui-card__title">{question.text}</h4>
 
-                  <p>Respostas: {question.responses}</p>
+                  <p className="ui-card__meta">
+                    Respostas: {question.responses}
+                  </p>
 
                   {question.type === "SCALE" && (
                     <>
@@ -264,42 +282,20 @@ export default function EvaluationResults({ evaluationId, onBack }: Props) {
                             return (
                               <div
                                 key={value}
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "12px",
-                                  marginBottom: "12px",
-                                }}
+                                className="results-distribution__row"
                               >
-                                <span style={{ minWidth: "50px" }}>
+                                <span className="results-distribution__label results-distribution__label--scale">
                                   Nota {value}
                                 </span>
 
-                                <div
-                                  style={{
-                                    flex: 1,
-                                    height: "12px",
-                                    backgroundColor: "#e5e7eb",
-                                    borderRadius: "10px",
-                                    overflow: "hidden",
-                                  }}
-                                >
+                                <div className="results-distribution__track">
                                   <div
-                                    style={{
-                                      width: `${percentage}%`,
-                                      height: "100%",
-                                      backgroundColor: "#2563eb",
-                                      borderRadius: "10px",
-                                    }}
+                                    className="results-distribution__fill"
+                                    style={{ width: `${percentage}%` }}
                                   />
                                 </div>
 
-                                <span
-                                  style={{
-                                    minWidth: "65px",
-                                    textAlign: "right",
-                                  }}
-                                >
+                                <span className="results-distribution__count">
                                   {count} ({percentage.toFixed(0)}%)
                                 </span>
                               </div>
@@ -325,42 +321,20 @@ export default function EvaluationResults({ evaluationId, onBack }: Props) {
                             return (
                               <div
                                 key={option}
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "12px",
-                                  marginBottom: "12px",
-                                }}
+                                className="results-distribution__row"
                               >
-                                <span style={{ minWidth: "90px" }}>
+                                <span className="results-distribution__label">
                                   {option}
                                 </span>
 
-                                <div
-                                  style={{
-                                    flex: 1,
-                                    height: "12px",
-                                    backgroundColor: "#e5e7eb",
-                                    borderRadius: "10px",
-                                    overflow: "hidden",
-                                  }}
-                                >
+                                <div className="results-distribution__track">
                                   <div
-                                    style={{
-                                      width: `${percentage}%`,
-                                      height: "100%",
-                                      backgroundColor: "#2563eb",
-                                      borderRadius: "10px",
-                                    }}
+                                    className="results-distribution__fill"
+                                    style={{ width: `${percentage}%` }}
                                   />
                                 </div>
 
-                                <span
-                                  style={{
-                                    minWidth: "65px",
-                                    textAlign: "right",
-                                  }}
-                                >
+                                <span className="results-distribution__count">
                                   {count} ({percentage.toFixed(0)}%)
                                 </span>
                               </div>
@@ -378,26 +352,9 @@ export default function EvaluationResults({ evaluationId, onBack }: Props) {
                       {question.comments.length === 0 ? (
                         <p>Nenhum comentário registrado.</p>
                       ) : (
-                        <div
-                          style={{
-                            display: "grid",
-                            gap: "12px",
-                          }}
-                        >
+                        <div className="results-comments">
                           {question.comments.map((comment, index) => (
-                            <div
-                              key={index}
-                              style={{
-                                padding: "14px 16px",
-                                backgroundColor: "#ffffff",
-                                border: "1px solid #e2e8f0",
-                                borderLeft: "3px solid #2563eb",
-                                borderRadius: "8px",
-                                lineHeight: "1.6",
-                                whiteSpace: "pre-wrap",
-                                overflowWrap: "anywhere",
-                              }}
-                            >
+                            <div key={index} className="results-comment">
                               {comment}
                             </div>
                           ))}

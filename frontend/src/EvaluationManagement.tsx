@@ -1,4 +1,5 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import EvaluationResults from "./EvaluationResults";
 
 type EvaluationPeriod = {
   id: string;
@@ -32,6 +33,9 @@ type RegisteredEvaluation = {
     discipline?: {
       name: string;
     };
+    academicTerm?: {
+      code: string;
+    };
   };
   questionnaire: {
     id: string;
@@ -42,10 +46,8 @@ type RegisteredEvaluation = {
 
 export default function EvaluationManagement({
   role,
-  onEvaluationsChanged,
 }: {
   role: "ADMIN" | "COORDINATOR";
-  onEvaluationsChanged: () => void;
 }) {
   const [periods, setPeriods] = useState<EvaluationPeriod[]>([]);
   const [classes, setClasses] = useState<ClassGroup[]>([]);
@@ -58,6 +60,10 @@ export default function EvaluationManagement({
   const [listLoading, setListLoading] = useState(true);
   const [listError, setListError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [selectedEvaluationId, setSelectedEvaluationId] = useState<
+    string | null
+  >(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   const [evaluationPeriodId, setEvaluationPeriodId] = useState("");
   const [classGroupId, setClassGroupId] = useState("");
@@ -205,9 +211,9 @@ export default function EvaluationManagement({
     setError("");
     setSuccess("");
 
-    window.scrollTo({
-      top: 0,
+    formRef.current?.scrollIntoView({
       behavior: "smooth",
+      block: "start",
     });
   }
 
@@ -278,7 +284,6 @@ export default function EvaluationManagement({
       );
 
       setSuccess("Avaliação excluída com sucesso!");
-      onEvaluationsChanged();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Erro ao excluir a avaliação.",
@@ -365,7 +370,6 @@ export default function EvaluationManagement({
       );
 
       setRefreshKey((previous) => previous + 1);
-      onEvaluationsChanged();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Erro ao cadastrar avaliação.",
@@ -388,13 +392,22 @@ export default function EvaluationManagement({
 
   const canSubmit =
     editingEvaluationId !== null ? !loading && !listLoading : canCreate;
+  if (selectedEvaluationId !== null) {
+    return (
+      <EvaluationResults
+        evaluationId={selectedEvaluationId}
+        onBack={() => setSelectedEvaluationId(null)}
+      />
+    );
+  }
   return (
     <section>
       <h2>Gerenciamento de avaliações</h2>
 
       <form
+        ref={formRef}
         onSubmit={handleSubmit}
-        className="evaluation-card"
+        className="evaluation-card ui-form"
         style={{ display: "grid", gap: "12px" }}
       >
         <h3>
@@ -499,19 +512,30 @@ export default function EvaluationManagement({
           quando o mínimo de respostas for atingido.
         </p>
 
-        <button type="submit" disabled={saving || !canSubmit}>
-          {saving
-            ? "Salvando..."
-            : editingEvaluationId
-              ? "Salvar alterações"
-              : "Cadastrar avaliação"}
-        </button>
-
-        {editingEvaluationId && (
-          <button type="button" onClick={handleCancelEdit} disabled={saving}>
-            Cancelar edição
+        <div className="ui-form__actions">
+          <button
+            type="submit"
+            className="ui-btn ui-btn--primary"
+            disabled={saving || !canSubmit}
+          >
+            {saving
+              ? "Salvando..."
+              : editingEvaluationId
+                ? "Salvar alterações"
+                : "Cadastrar avaliação"}
           </button>
-        )}
+
+          {editingEvaluationId && (
+            <button
+              type="button"
+              className="ui-btn ui-btn--secondary"
+              onClick={handleCancelEdit}
+              disabled={saving}
+            >
+              Cancelar edição
+            </button>
+          )}
+        </div>
       </form>
 
       {editingEvaluationId === null && !canCreate && !loading && !error && (
@@ -522,13 +546,13 @@ export default function EvaluationManagement({
       )}
 
       {error && (
-        <p role="alert" style={{ color: "#dc2626" }}>
+        <p role="alert" className="ui-feedback ui-feedback--error">
           {error}
         </p>
       )}
 
       {success && (
-        <p role="status" style={{ color: "#15803d" }}>
+        <p role="status" className="ui-feedback ui-feedback--success">
           {success}
         </p>
       )}
@@ -536,7 +560,7 @@ export default function EvaluationManagement({
       <h3 style={{ marginTop: "32px" }}>Gerenciar avaliações cadastradas</h3>
 
       {listError && (
-        <p role="alert" style={{ color: "#dc2626" }}>
+        <p role="alert" className="ui-feedback ui-feedback--error">
           {listError}
         </p>
       )}
@@ -548,66 +572,60 @@ export default function EvaluationManagement({
       ) : (
         <ul className="evaluation-list">
           {registeredEvaluations.map((evaluation) => (
-            <li key={evaluation.id} className="evaluation-card">
-              <strong>
+            <li key={evaluation.id} className="evaluation-card ui-card">
+              <h4 className="ui-card__title">
                 {evaluation.classGroup.discipline?.name ??
                   "Disciplina não informada"}
-              </strong>
+              </h4>
 
-              <p>Turma: {evaluation.classGroup.code}</p>
+              <p className="ui-card__meta">
+                Turma: {evaluation.classGroup.code}
+              </p>
 
-              <p>Período: {evaluation.evaluationPeriod.name}</p>
+              {evaluation.classGroup.academicTerm && (
+                <p className="ui-card__meta">
+                  Semestre: {evaluation.classGroup.academicTerm.code}
+                </p>
+              )}
 
-              <p>Questionário: {evaluation.questionnaire.name}</p>
+              <p className="ui-card__meta">
+                Período: {evaluation.evaluationPeriod.name}
+              </p>
 
-              <p>
+              <p className="ui-card__meta">
+                Questionário: {evaluation.questionnaire.name}
+              </p>
+
+              <p className="ui-card__meta">
                 Mínimo de respostas:{" "}
                 {evaluation.minResponsesForResults ?? "Não definido"}
               </p>
 
-              <div
-                style={{
-                  display: "flex",
-                  gap: "8px",
-                  flexWrap: "wrap",
-                  marginTop: "16px",
-                }}
-              >
+              <div className="ui-card__actions">
                 <button
                   type="button"
+                  className="ui-btn ui-btn--primary"
                   onClick={() => handleEdit(evaluation)}
                   disabled={saving || loading || listLoading}
-                  style={{
-                    flex: 1,
-                    minWidth: "120px",
-                    backgroundColor: "#2563eb",
-                    color: "#ffffff",
-                    border: "1px solid #2563eb",
-                    borderRadius: "12px",
-                    padding: "12px 16px",
-                    fontSize: "18px",
-                    fontWeight: 700,
-                  }}
                 >
                   Editar
+                </button>
+
+                <button
+                  type="button"
+                  className="ui-btn ui-btn--secondary"
+                  onClick={() => setSelectedEvaluationId(evaluation.id)}
+                  disabled={saving || listLoading}
+                >
+                  Ver resultados
                 </button>
 
                 {role === "ADMIN" && (
                   <button
                     type="button"
+                    className="ui-btn ui-btn--danger"
                     onClick={() => void handleDelete(evaluation)}
                     disabled={saving || listLoading}
-                    style={{
-                      flex: 1,
-                      minWidth: "120px",
-                      backgroundColor: "#fef2f2",
-                      color: "#b91c1c",
-                      border: "1px solid #fecaca",
-                      borderRadius: "12px",
-                      padding: "12px 16px",
-                      fontSize: "18px",
-                      fontWeight: 700,
-                    }}
                   >
                     Excluir
                   </button>

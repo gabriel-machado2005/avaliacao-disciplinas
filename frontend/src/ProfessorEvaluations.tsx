@@ -98,7 +98,11 @@ export default function ProfessorEvaluations({
   }
 
   if (error) {
-    return <p role="alert">{error}</p>;
+    return (
+      <p role="alert" className="ui-feedback ui-feedback--error">
+        {error}
+      </p>
+    );
   }
 
   if (evaluations.length === 0) {
@@ -108,19 +112,30 @@ export default function ProfessorEvaluations({
   return (
     <ul className="evaluation-list">
       {evaluations.map((evaluation) => (
-        <li key={evaluation.id} className="evaluation-card">
-          <strong>{evaluation.classGroup.discipline.name}</strong>
+        <li key={evaluation.id} className="evaluation-card ui-card">
+          <h4 className="ui-card__title">
+            {evaluation.classGroup.discipline.name}
+          </h4>
 
-          <p>Turma: {evaluation.classGroup.code}</p>
-          <p>Semestre: {evaluation.classGroup.academicTerm.code}</p>
-          <p>Período: {evaluation.evaluationPeriod.name}</p>
+          <p className="ui-card__meta">Turma: {evaluation.classGroup.code}</p>
 
-          <button
-            type="button"
-            onClick={() => setSelectedEvaluationId(evaluation.id)}
-          >
-            Ver resultados
-          </button>
+          <p className="ui-card__meta">
+            Semestre: {evaluation.classGroup.academicTerm.code}
+          </p>
+
+          <p className="ui-card__meta">
+            Período: {evaluation.evaluationPeriod.name}
+          </p>
+
+          <div className="ui-card__actions">
+            <button
+              type="button"
+              className="ui-btn ui-btn--secondary"
+              onClick={() => setSelectedEvaluationId(evaluation.id)}
+            >
+              Ver resultados
+            </button>
+          </div>
         </li>
       ))}
     </ul>

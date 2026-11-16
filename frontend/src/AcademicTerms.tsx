@@ -262,11 +262,7 @@ export default function AcademicTerms({ role }: AcademicTermsProps) {
     <section>
       <h2>Gerenciamento de semestres letivos</h2>
 
-      <form
-        onSubmit={handleSubmit}
-        className="evaluation-card"
-        style={{ display: "grid", gap: "12px" }}
-      >
+      <form onSubmit={handleSubmit} className="evaluation-card ui-form">
         <h3>
           {editingTermId ? "Editar semestre letivo" : "Cadastrar novo semestre"}
         </h3>
@@ -304,29 +300,40 @@ export default function AcademicTerms({ role }: AcademicTermsProps) {
           disabled={saving}
         />
 
-        <button type="submit" disabled={saving || loading}>
-          {saving
-            ? "Salvando..."
-            : editingTermId
-              ? "Salvar alterações"
-              : "Cadastrar semestre"}
-        </button>
-
-        {editingTermId && (
-          <button type="button" onClick={handleCancelEdit} disabled={saving}>
-            Cancelar edição
+        <div className="ui-form__actions">
+          <button
+            type="submit"
+            className="ui-btn ui-btn--primary"
+            disabled={saving || loading}
+          >
+            {saving
+              ? "Salvando..."
+              : editingTermId
+                ? "Salvar alterações"
+                : "Cadastrar semestre"}
           </button>
-        )}
+
+          {editingTermId && (
+            <button
+              type="button"
+              className="ui-btn ui-btn--secondary"
+              onClick={handleCancelEdit}
+              disabled={saving}
+            >
+              Cancelar edição
+            </button>
+          )}
+        </div>
       </form>
 
       {error && (
-        <p role="alert" style={{ color: "#dc2626" }}>
+        <p role="alert" className="ui-feedback ui-feedback--error">
           {error}
         </p>
       )}
 
       {success && (
-        <p role="status" style={{ color: "#15803d" }}>
+        <p role="status" className="ui-feedback ui-feedback--success">
           {success}
         </p>
       )}
@@ -340,37 +347,33 @@ export default function AcademicTerms({ role }: AcademicTermsProps) {
       ) : (
         <ul className="evaluation-list">
           {terms.map((term) => (
-            <li key={term.id} className="evaluation-card">
-              <strong>{term.code}</strong>
+            <li key={term.id} className="evaluation-card ui-card">
+              <div className="ui-card__header">
+                <h4 className="ui-card__title">{term.code}</h4>
 
-              <p>Início: {formatDate(term.startDate)}</p>
-              <p>Encerramento: {formatDate(term.endDate)}</p>
-              <p>Situação: {term.active ? "Ativo" : "Inativo"}</p>
+                <span
+                  className={`ui-status ${
+                    term.active ? "ui-status--active" : "ui-status--inactive"
+                  }`}
+                >
+                  {term.active ? "Ativo" : "Inativo"}
+                </span>
+              </div>
 
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: canDeleteTerms
-                    ? "repeat(2, minmax(0, 1fr))"
-                    : "1fr",
-                  gap: "16px",
-                  width: "100%",
-                  marginTop: "16px",
-                }}
-              >
+              <p className="ui-card__meta">
+                Início: {formatDate(term.startDate)}
+              </p>
+
+              <p className="ui-card__meta">
+                Encerramento: {formatDate(term.endDate)}
+              </p>
+
+              <div className="ui-card__actions">
                 <button
                   type="button"
+                  className="ui-btn ui-btn--primary"
                   onClick={() => handleEdit(term)}
                   disabled={saving || deletingTermId !== null}
-                  style={{
-                    backgroundColor: "#2563eb",
-                    color: "#ffffff",
-                    border: "1px solid #2563eb",
-                    borderRadius: "12px",
-                    padding: "12px 16px",
-                    fontSize: "18px",
-                    fontWeight: 700,
-                  }}
                 >
                   Editar
                 </button>
@@ -378,17 +381,9 @@ export default function AcademicTerms({ role }: AcademicTermsProps) {
                 {canDeleteTerms && (
                   <button
                     type="button"
+                    className="ui-btn ui-btn--danger"
                     onClick={() => void handleDelete(term)}
                     disabled={saving || deletingTermId !== null}
-                    style={{
-                      backgroundColor: "#fff1f2",
-                      color: "#be123c",
-                      border: "1px solid #fecaca",
-                      borderRadius: "12px",
-                      padding: "12px 16px",
-                      fontSize: "18px",
-                      fontWeight: 700,
-                    }}
                   >
                     {deletingTermId === term.id ? "Excluindo..." : "Excluir"}
                   </button>

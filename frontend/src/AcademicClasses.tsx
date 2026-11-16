@@ -356,11 +356,7 @@ export default function AcademicClasses({ role }: AcademicClassesProps) {
     <section>
       <h2>Gerenciamento de turmas</h2>
 
-      <form
-        onSubmit={handleSubmit}
-        className="evaluation-card"
-        style={{ display: "grid", gap: "12px" }}
-      >
+      <form onSubmit={handleSubmit} className="evaluation-card ui-form">
         <h3>{editingClassId ? "Editar turma" : "Cadastrar nova turma"}</h3>
 
         <label htmlFor="class-code">Código da turma</label>
@@ -437,29 +433,40 @@ export default function AcademicClasses({ role }: AcademicClassesProps) {
           </p>
         )}
 
-        <button type="submit" disabled={saving || !canCreate}>
-          {saving
-            ? "Salvando..."
-            : editingClassId
-              ? "Salvar alterações"
-              : "Cadastrar turma"}
-        </button>
-
-        {editingClassId && (
-          <button type="button" onClick={handleCancelEdit} disabled={saving}>
-            Cancelar edição
+        <div className="ui-form__actions">
+          <button
+            type="submit"
+            className="ui-btn ui-btn--primary"
+            disabled={saving || !canCreate}
+          >
+            {saving
+              ? "Salvando..."
+              : editingClassId
+                ? "Salvar alterações"
+                : "Cadastrar turma"}
           </button>
-        )}
+
+          {editingClassId && (
+            <button
+              type="button"
+              className="ui-btn ui-btn--secondary"
+              onClick={handleCancelEdit}
+              disabled={saving}
+            >
+              Cancelar edição
+            </button>
+          )}
+        </div>
       </form>
 
       {error && (
-        <p role="alert" style={{ color: "#dc2626" }}>
+        <p role="alert" className="ui-feedback ui-feedback--error">
           {error}
         </p>
       )}
 
       {success && (
-        <p role="status" style={{ color: "#15803d" }}>
+        <p role="status" className="ui-feedback ui-feedback--success">
           {success}
         </p>
       )}
@@ -473,37 +480,25 @@ export default function AcademicClasses({ role }: AcademicClassesProps) {
       ) : (
         <ul className="evaluation-list">
           {classes.map((item) => (
-            <li key={item.id} className="evaluation-card">
-              <strong>{item.code}</strong>
+            <li key={item.id} className="evaluation-card ui-card">
+              <h4 className="ui-card__title">{item.code}</h4>
 
-              <p>Disciplina: {getDisciplineName(item)}</p>
-              <p>Professor: {getProfessorName(item)}</p>
-              <p>Semestre: {getTermCode(item)}</p>
+              <p className="ui-card__meta">
+                Disciplina: {getDisciplineName(item)}
+              </p>
 
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: canDeleteClasses
-                    ? "repeat(2, minmax(0, 1fr))"
-                    : "1fr",
-                  gap: "16px",
-                  width: "100%",
-                  marginTop: "16px",
-                }}
-              >
+              <p className="ui-card__meta">
+                Professor: {getProfessorName(item)}
+              </p>
+
+              <p className="ui-card__meta">Semestre: {getTermCode(item)}</p>
+
+              <div className="ui-card__actions">
                 <button
                   type="button"
+                  className="ui-btn ui-btn--primary"
                   onClick={() => handleEdit(item)}
                   disabled={saving || deletingClassId !== null}
-                  style={{
-                    backgroundColor: "#2563eb",
-                    color: "#ffffff",
-                    border: "1px solid #2563eb",
-                    borderRadius: "12px",
-                    padding: "12px 16px",
-                    fontSize: "18px",
-                    fontWeight: 700,
-                  }}
                 >
                   Editar
                 </button>
@@ -511,17 +506,9 @@ export default function AcademicClasses({ role }: AcademicClassesProps) {
                 {canDeleteClasses && (
                   <button
                     type="button"
+                    className="ui-btn ui-btn--danger"
                     onClick={() => void handleDelete(item)}
                     disabled={saving || deletingClassId !== null}
-                    style={{
-                      backgroundColor: "#fff1f2",
-                      color: "#be123c",
-                      border: "1px solid #fecaca",
-                      borderRadius: "12px",
-                      padding: "12px 16px",
-                      fontSize: "18px",
-                      fontWeight: 700,
-                    }}
                   >
                     {deletingClassId === item.id ? "Excluindo..." : "Excluir"}
                   </button>

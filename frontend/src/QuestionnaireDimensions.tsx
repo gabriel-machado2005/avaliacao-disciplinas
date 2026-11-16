@@ -215,14 +215,7 @@ export default function QuestionnaireDimensions({
         Questionário: <strong>{questionnaireName}</strong>
       </p>
 
-      <form
-        onSubmit={handleSubmit}
-        className="evaluation-card"
-        style={{
-          display: "grid",
-          gap: "12px",
-        }}
-      >
+      <form onSubmit={handleSubmit} className="evaluation-card ui-form">
         <h3>Adicionar nova dimensão</h3>
 
         <label htmlFor="dimension-name">Nome da dimensão</label>
@@ -262,19 +255,25 @@ export default function QuestionnaireDimensions({
           disabled={saving}
         />
 
-        <button type="submit" disabled={saving}>
-          {saving ? "Cadastrando..." : "Adicionar dimensão"}
-        </button>
+        <div className="ui-form__actions">
+          <button
+            type="submit"
+            className="ui-btn ui-btn--primary"
+            disabled={saving}
+          >
+            {saving ? "Cadastrando..." : "Adicionar dimensão"}
+          </button>
+        </div>
       </form>
 
       {error && (
-        <p role="alert" style={{ color: "#dc2626" }}>
+        <p role="alert" className="ui-feedback ui-feedback--error">
           {error}
         </p>
       )}
 
       {success && (
-        <p role="status" style={{ color: "#15803d" }}>
+        <p role="status" className="ui-feedback ui-feedback--success">
           {success}
         </p>
       )}
@@ -285,12 +284,13 @@ export default function QuestionnaireDimensions({
         <p>Carregando dimensões...</p>
       ) : listError ? (
         <>
-          <p role="alert" style={{ color: "#dc2626" }}>
+          <p role="alert" className="ui-feedback ui-feedback--error">
             {listError}
           </p>
 
           <button
             type="button"
+            className="ui-btn ui-btn--secondary"
             onClick={() => {
               setLoading(true);
               setListError("");
@@ -305,55 +305,60 @@ export default function QuestionnaireDimensions({
       ) : (
         <ul className="evaluation-list">
           {dimensions.map((dimension) => (
-            <li key={dimension.id} className="evaluation-card">
-              <h4>{dimension.name}</h4>
+            <li key={dimension.id} className="evaluation-card ui-card">
+              <h4 className="ui-card__title">{dimension.name}</h4>
 
-              {dimension.description && <p>{dimension.description}</p>}
+              {dimension.description && (
+                <p className="ui-card__meta">{dimension.description}</p>
+              )}
 
-              <p>Ordem: {dimension.order}</p>
+              <p className="ui-card__meta">Ordem: {dimension.order}</p>
 
-              <p>Perguntas cadastradas: {dimension.questions?.length ?? 0}</p>
+              <p className="ui-card__meta">
+                Perguntas cadastradas: {dimension.questions?.length ?? 0}
+              </p>
 
               {dimension.questions?.length > 0 && (
-                <div style={{ marginTop: "16px" }}>
-                  <h4>Perguntas desta dimensão</h4>
+                <div className="ui-question-section">
+                  <h5 className="ui-question-section__title">
+                    Perguntas desta dimensão
+                  </h5>
 
-                  <ol style={{ paddingLeft: "24px" }}>
+                  <ol className="ui-question-list">
                     {dimension.questions.map((question) => (
-                      <li
-                        key={question.id}
-                        style={{
-                          marginBottom: "16px",
-                          paddingBottom: "12px",
-                          borderBottom: "1px solid #e5e7eb",
-                        }}
-                      >
-                        <strong>{question.text}</strong>
-
-                        <p>
-                          Tipo:{" "}
-                          {question.type === "SCALE"
-                            ? "Escala numérica"
-                            : question.type === "SINGLE_CHOICE"
-                              ? "Múltipla escolha"
-                              : "Resposta aberta"}
+                      <li key={question.id} className="ui-question-item">
+                        <p className="ui-question-item__text">
+                          {question.text}
                         </p>
 
-                        <p>Ordem: {question.order}</p>
+                        <div className="ui-question-item__details">
+                          <span>
+                            Tipo:{" "}
+                            {question.type === "SCALE"
+                              ? "Escala numérica"
+                              : question.type === "SINGLE_CHOICE"
+                                ? "Múltipla escolha"
+                                : "Resposta aberta"}
+                          </span>
 
-                        <p>Obrigatória: {question.required ? "Sim" : "Não"}</p>
+                          <span>Ordem: {question.order}</span>
+
+                          <span>
+                            Obrigatória: {question.required ? "Sim" : "Não"}
+                          </span>
+                        </div>
 
                         {question.type === "SCALE" && (
-                          <p>
+                          <p className="ui-question-item__extra">
                             Escala: {question.scaleMin} a {question.scaleMax}
                           </p>
                         )}
 
                         {question.type === "SINGLE_CHOICE" && (
-                          <div>
+                          <div className="ui-question-item__extra">
                             <p>Alternativas:</p>
 
-                            <ul>
+                            <ul className="ui-question-item__options">
                               {(question.options ?? []).map((option, index) => (
                                 <li key={`${question.id}-${index}`}>
                                   {option}
@@ -364,7 +369,9 @@ export default function QuestionnaireDimensions({
                         )}
 
                         {question.type === "TEXT" && (
-                          <p>Resposta em texto livre.</p>
+                          <p className="ui-question-item__extra">
+                            Resposta em texto livre.
+                          </p>
                         )}
                       </li>
                     ))}
@@ -372,18 +379,21 @@ export default function QuestionnaireDimensions({
                 </div>
               )}
 
-              <button
-                type="button"
-                onClick={() =>
-                  setSelectedDimensionId((current) =>
-                    current === dimension.id ? null : dimension.id,
-                  )
-                }
-              >
-                {selectedDimensionId === dimension.id
-                  ? "Fechar gerenciamento"
-                  : "Gerenciar perguntas"}
-              </button>
+              <div className="ui-card__actions">
+                <button
+                  type="button"
+                  className="ui-btn ui-btn--secondary"
+                  onClick={() =>
+                    setSelectedDimensionId((current) =>
+                      current === dimension.id ? null : dimension.id,
+                    )
+                  }
+                >
+                  {selectedDimensionId === dimension.id
+                    ? "Fechar gerenciamento"
+                    : "Gerenciar perguntas"}
+                </button>
+              </div>
             </li>
           ))}
         </ul>

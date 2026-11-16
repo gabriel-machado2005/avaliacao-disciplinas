@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import ProfessorEvaluations from "./ProfessorEvaluations";
 import AcademicCourses from "./AcademicCourses";
 import AcademicDisciplines from "./AcademicDisciplines";
 import AcademicTerms from "./AcademicTerms";
@@ -192,11 +191,50 @@ export default function AdministrativePanel({ role }: Props) {
     );
   }, [activeSection, role]);
 
-  const [evaluationsRefreshKey, setEvaluationsRefreshKey] = useState(0);
+  const [menuExpanded, setMenuExpanded] = useState(() => {
+    const saved = sessionStorage.getItem(
+      `administrative-panel-menu-expanded:${role}`,
+    );
+
+    return saved !== "false";
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem(
+      `administrative-panel-menu-expanded:${role}`,
+      String(menuExpanded),
+    );
+  }, [menuExpanded, role]);
+
+  const activeSectionLabel =
+    MENU_GROUPS.flatMap((group) => group.items).find(
+      (item) => item.section === activeSection,
+    )?.title ?? "Avaliações";
 
   return (
     <div>
-      <nav className="admin-menu" aria-label="Navegação administrativa">
+      <div className="admin-menu__toolbar">
+        <span>
+          Área atual: <strong>{activeSectionLabel}</strong>
+        </span>
+
+        <button
+          type="button"
+          className="admin-menu__toggle"
+          aria-expanded={menuExpanded}
+          aria-controls="admin-panel-navigation"
+          onClick={() => setMenuExpanded((previous) => !previous)}
+        >
+          {menuExpanded ? "Ocultar menu" : "Mostrar menu"}
+        </button>
+      </div>
+
+      <nav
+        id="admin-panel-navigation"
+        className="admin-menu"
+        aria-label="Navegação administrativa"
+        style={{ display: menuExpanded ? "flex" : "none" }}
+      >
         {MENU_GROUPS.map((group, groupIndex) => (
           <section
             className="admin-menu__group"
@@ -238,21 +276,7 @@ export default function AdministrativePanel({ role }: Props) {
       </nav>
 
       {activeSection === "evaluations" ? (
-        <>
-          <EvaluationManagement
-            role={role}
-            onEvaluationsChanged={() =>
-              setEvaluationsRefreshKey((previous) => previous + 1)
-            }
-          />
-
-          <h2 style={{ marginTop: "32px" }}>Avaliações cadastradas</h2>
-
-          <ProfessorEvaluations
-            role={role}
-            refreshKey={evaluationsRefreshKey}
-          />
-        </>
+        <EvaluationManagement role={role} />
       ) : activeSection === "courses" ? (
         <AcademicCourses role={role} />
       ) : activeSection === "disciplines" ? (

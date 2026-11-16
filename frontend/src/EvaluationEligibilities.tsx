@@ -33,6 +33,9 @@ export default function EvaluationEligibilities() {
   const [loading, setLoading] = useState(true);
   const [loadingEligibilities, setLoadingEligibilities] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [revokingEligibilityId, setRevokingEligibilityId] = useState<
+    string | null
+  >(null);
 
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -227,6 +230,74 @@ export default function EvaluationEligibilities() {
     }
   }
 
+  async function handleRevoke(eligibility: Eligibility) {
+    if (
+      !evaluationId ||
+      eligibility.completed ||
+      saving ||
+      loadingEligibilities ||
+      revokingEligibilityId !== null
+    ) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Deseja desabilitar o estudante "${eligibility.student.name}" desta avaliação?\n\n` +
+        "O estudante perderá o acesso a esta avaliação.\n\n" +
+        "A habilitação poderá ser cadastrada novamente, desde que o estudante ainda não tenha respondido.",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setError("");
+    setSuccess("");
+    setRevokingEligibilityId(eligibility.id);
+
+    try {
+      const token = sessionStorage.getItem("accessToken");
+
+      if (!token) {
+        throw new Error("Faça login novamente para continuar.");
+      }
+
+      const response = await fetch(
+        `http://localhost:3000/evaluations/eligibilities/${eligibility.id}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      if (!response.ok) {
+        const data: { message?: string | string[] } = await response
+          .json()
+          .catch(() => ({}));
+
+        const message = Array.isArray(data.message)
+          ? data.message.join(" ")
+          : data.message;
+
+        throw new Error(message || "Não foi possível desabilitar o estudante.");
+      }
+
+      setEligibilities((previous) =>
+        previous.filter((item) => item.id !== eligibility.id),
+      );
+
+      setSuccess("Estudante desabilitado com sucesso!");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Erro ao desabilitar estudante.",
+      );
+    } finally {
+      setRevokingEligibilityId(null);
+    }
+  }
+
   return (
     <section>
       <h2>Gerenciamento de estudantes habilitados</h2>
@@ -344,20 +415,48 @@ export default function EvaluationEligibilities() {
 
             <ul className="evaluation-list">
               {eligibilities.map((eligibility) => (
-                <li key={eligibility.id} className="evaluation-card">
-                  <h4>{eligibility.student.name}</h4>
+                <li
+                  key={eligibility.id}
+                  className="evaluation-card eligibility-card"
+                >
+                  <div className="eligibility-card__header">
+                    <h4 className="eligibility-card__name">
+                      {eligibility.student.name}
+                    </h4>
 
-                  <p>
-                    Situação:{" "}
-                    <strong>
+                    <span
+                      className={`eligibility-card__status ${
+                        eligibility.completed
+                          ? "eligibility-card__status--completed"
+                          : "eligibility-card__status--pending"
+                      }`}
+                    >
                       {eligibility.completed ? "Concluída" : "Pendente"}
-                    </strong>
-                  </p>
+                    </span>
+                  </div>
 
-                  <p>
+                  <p className="eligibility-card__date">
                     Habilitado em:{" "}
                     {new Date(eligibility.createdAt).toLocaleString("pt-BR")}
                   </p>
+                  {!eligibility.completed && (
+                    <div className="eligibility-card__actions">
+                      <button
+                        type="button"
+                        className="eligibility-card__revoke"
+                        onClick={() => void handleRevoke(eligibility)}
+                        disabled={
+                          saving ||
+                          loadingEligibilities ||
+                          revokingEligibilityId !== null
+                        }
+                      >
+                        {revokingEligibilityId === eligibility.id
+                          ? "Desabilitando..."
+                          : "Desabilitar"}
+                      </button>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>

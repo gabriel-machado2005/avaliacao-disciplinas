@@ -335,11 +335,7 @@ export default function EvaluationPeriods({
     <section>
       <h2>Gerenciamento de períodos de avaliação</h2>
 
-      <form
-        onSubmit={handleSubmit}
-        className="evaluation-card"
-        style={{ display: "grid", gap: "12px" }}
-      >
+      <form onSubmit={handleSubmit} className="evaluation-card ui-form">
         <h3>
           {editingPeriodId
             ? "Editar período de avaliação"
@@ -382,29 +378,40 @@ export default function EvaluationPeriods({
           disabled={saving}
         />
 
-        <button type="submit" disabled={saving || loading}>
-          {saving
-            ? "Salvando..."
-            : editingPeriodId
-              ? "Salvar alterações"
-              : "Cadastrar período"}
-        </button>
-
-        {editingPeriodId && (
-          <button type="button" onClick={handleCancelEdit} disabled={saving}>
-            Cancelar edição
+        <div className="ui-form__actions">
+          <button
+            type="submit"
+            className="ui-btn ui-btn--primary"
+            disabled={saving || loading}
+          >
+            {saving
+              ? "Salvando..."
+              : editingPeriodId
+                ? "Salvar alterações"
+                : "Cadastrar período"}
           </button>
-        )}
+
+          {editingPeriodId && (
+            <button
+              type="button"
+              className="ui-btn ui-btn--secondary"
+              onClick={handleCancelEdit}
+              disabled={saving}
+            >
+              Cancelar edição
+            </button>
+          )}
+        </div>
       </form>
 
       {error && (
-        <p role="alert" style={{ color: "#dc2626" }}>
+        <p role="alert" className="ui-feedback ui-feedback--error">
           {error}
         </p>
       )}
 
       {success && (
-        <p role="status" style={{ color: "#15803d" }}>
+        <p role="status" className="ui-feedback ui-feedback--success">
           {success}
         </p>
       )}
@@ -418,36 +425,33 @@ export default function EvaluationPeriods({
       ) : (
         <ul className="evaluation-list">
           {periods.map((period) => (
-            <li key={period.id} className="evaluation-card">
-              <strong>{period.name}</strong>
+            <li key={period.id} className="evaluation-card ui-card">
+              <div className="ui-card__header">
+                <h4 className="ui-card__title">{period.name}</h4>
 
-              <p>Início: {formatDateTime(period.startDate)}</p>
+                <span
+                  className={`ui-status ${
+                    period.active ? "ui-status--active" : "ui-status--inactive"
+                  }`}
+                >
+                  {period.active ? "Ativo" : "Inativo"}
+                </span>
+              </div>
 
-              <p>Encerramento: {formatDateTime(period.endDate)}</p>
+              <p className="ui-card__meta">
+                Início: {formatDateTime(period.startDate)}
+              </p>
 
-              <p>Situação: {period.active ? "Ativo" : "Inativo"}</p>
+              <p className="ui-card__meta">
+                Encerramento: {formatDateTime(period.endDate)}
+              </p>
 
-              <div
-                style={{
-                  display: "flex",
-                  gap: "8px",
-                  marginTop: "16px",
-                }}
-              >
+              <div className="ui-card__actions">
                 <button
                   type="button"
+                  className="ui-btn ui-btn--primary"
                   onClick={() => handleEdit(period)}
                   disabled={saving}
-                  style={{
-                    flex: 1,
-                    backgroundColor: "#2563eb",
-                    color: "#ffffff",
-                    border: "1px solid #2563eb",
-                    borderRadius: "12px",
-                    padding: "12px 16px",
-                    fontSize: "18px",
-                    fontWeight: 700,
-                  }}
                 >
                   Editar
                 </button>
@@ -455,18 +459,9 @@ export default function EvaluationPeriods({
                 {role === "ADMIN" && (
                   <button
                     type="button"
+                    className="ui-btn ui-btn--danger"
                     onClick={() => void handleDelete(period)}
                     disabled={saving}
-                    style={{
-                      flex: 1,
-                      backgroundColor: "#fef2f2",
-                      color: "#b91c1c",
-                      border: "1px solid #fecaca",
-                      borderRadius: "12px",
-                      padding: "12px 16px",
-                      fontSize: "18px",
-                      fontWeight: 700,
-                    }}
                   >
                     Excluir
                   </button>

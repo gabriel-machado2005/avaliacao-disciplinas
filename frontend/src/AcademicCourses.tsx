@@ -236,11 +236,7 @@ export default function AcademicCourses({ role }: AcademicCoursesProps) {
     <section>
       <h2>Gerenciamento de cursos</h2>
 
-      <form
-        onSubmit={handleSubmit}
-        className="evaluation-card"
-        style={{ display: "grid", gap: "12px" }}
-      >
+      <form onSubmit={handleSubmit} className="evaluation-card ui-form">
         <h3>{editingCourseId ? "Editar curso" : "Cadastrar novo curso"}</h3>
 
         <label htmlFor="course-code">Código do curso</label>
@@ -267,43 +263,42 @@ export default function AcademicCourses({ role }: AcademicCoursesProps) {
           disabled={saving}
         />
 
-        <button type="submit" disabled={saving}>
-          {saving
-            ? editingCourseId
-              ? "Salvando..."
-              : "Cadastrando..."
-            : editingCourseId
-              ? "Salvar alterações"
-              : "Cadastrar curso"}
-        </button>
-
-        {editingCourseId && (
+        <div className="ui-form__actions">
           <button
-            type="button"
-            onClick={handleCancelEdit}
+            type="submit"
+            className="ui-btn ui-btn--primary"
             disabled={saving}
-            style={{
-              backgroundColor: "#e2e8f0",
-              color: "#334155",
-              border: "1px solid #cbd5e1",
-              borderRadius: "10px",
-              padding: "10px 16px",
-              cursor: saving ? "not-allowed" : "pointer",
-            }}
           >
-            Cancelar edição
+            {saving
+              ? editingCourseId
+                ? "Salvando..."
+                : "Cadastrando..."
+              : editingCourseId
+                ? "Salvar alterações"
+                : "Cadastrar curso"}
           </button>
-        )}
+
+          {editingCourseId && (
+            <button
+              type="button"
+              className="ui-btn ui-btn--secondary"
+              onClick={handleCancelEdit}
+              disabled={saving}
+            >
+              Cancelar edição
+            </button>
+          )}
+        </div>
       </form>
 
       {error && (
-        <p role="alert" style={{ color: "#dc2626" }}>
+        <p role="alert" className="ui-feedback ui-feedback--error">
           {error}
         </p>
       )}
 
       {success && (
-        <p role="status" style={{ color: "#15803d" }}>
+        <p role="status" className="ui-feedback ui-feedback--success">
           {success}
         </p>
       )}
@@ -317,30 +312,17 @@ export default function AcademicCourses({ role }: AcademicCoursesProps) {
       ) : (
         <ul className="evaluation-list">
           {courses.map((course) => (
-            <li key={course.id} className="evaluation-card">
-              <strong>{course.name}</strong>
-              <p>Código: {course.code}</p>
+            <li key={course.id} className="evaluation-card ui-card">
+              <h4 className="ui-card__title">{course.name}</h4>
 
-              <div
-                style={{
-                  display: "flex",
-                  gap: "12px",
-                  marginTop: "16px",
-                  flexWrap: "wrap",
-                }}
-              >
+              <p className="ui-card__meta">Código: {course.code}</p>
+
+              <div className="ui-card__actions">
                 <button
                   type="button"
+                  className="ui-btn ui-btn--primary"
                   onClick={() => handleEdit(course)}
                   disabled={saving || deletingCourseId !== null}
-                  style={{
-                    flex: "1 1 140px",
-                    width: "auto",
-                    marginTop: 0,
-                    padding: "10px 18px",
-                    borderRadius: "10px",
-                    cursor: "pointer",
-                  }}
                 >
                   Editar
                 </button>
@@ -348,19 +330,9 @@ export default function AcademicCourses({ role }: AcademicCoursesProps) {
                 {canDeleteCourses && (
                   <button
                     type="button"
+                    className="ui-btn ui-btn--danger"
                     onClick={() => void handleDelete(course)}
                     disabled={saving || deletingCourseId !== null}
-                    style={{
-                      flex: "1 1 140px",
-                      width: "auto",
-                      marginTop: 0,
-                      padding: "10px 18px",
-                      borderRadius: "10px",
-                      backgroundColor: "#fff1f2",
-                      color: "#be123c",
-                      border: "1px solid #fecdd3",
-                      cursor: "pointer",
-                    }}
                   >
                     {deletingCourseId === course.id
                       ? "Excluindo..."

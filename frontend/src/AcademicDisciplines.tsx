@@ -300,11 +300,7 @@ export default function AcademicDisciplines({
     <section>
       <h2>Gerenciamento de disciplinas</h2>
 
-      <form
-        onSubmit={handleSubmit}
-        className="evaluation-card"
-        style={{ display: "grid", gap: "12px" }}
-      >
+      <form onSubmit={handleSubmit} className="evaluation-card ui-form">
         <h3>
           {editingDisciplineId
             ? "Editar disciplina"
@@ -359,46 +355,42 @@ export default function AcademicDisciplines({
           <p>Cadastre um curso antes de criar disciplinas.</p>
         )}
 
-        <button
-          type="submit"
-          disabled={saving || loading || courses.length === 0}
-        >
-          {saving
-            ? editingDisciplineId
-              ? "Salvando..."
-              : "Cadastrando..."
-            : editingDisciplineId
-              ? "Salvar alterações"
-              : "Cadastrar disciplina"}
-        </button>
-
-        {editingDisciplineId && (
+        <div className="ui-form__actions">
           <button
-            type="button"
-            onClick={handleCancelEdit}
-            disabled={saving}
-            style={{
-              backgroundColor: "#e2e8f0",
-              color: "#334155",
-              border: "1px solid #cbd5e1",
-              borderRadius: "10px",
-              padding: "10px 16px",
-              cursor: saving ? "not-allowed" : "pointer",
-            }}
+            type="submit"
+            className="ui-btn ui-btn--primary"
+            disabled={saving || loading || courses.length === 0}
           >
-            Cancelar edição
+            {saving
+              ? editingDisciplineId
+                ? "Salvando..."
+                : "Cadastrando..."
+              : editingDisciplineId
+                ? "Salvar alterações"
+                : "Cadastrar disciplina"}
           </button>
-        )}
+
+          {editingDisciplineId && (
+            <button
+              type="button"
+              className="ui-btn ui-btn--secondary"
+              onClick={handleCancelEdit}
+              disabled={saving}
+            >
+              Cancelar edição
+            </button>
+          )}
+        </div>
       </form>
 
       {error && (
-        <p role="alert" style={{ color: "#dc2626" }}>
+        <p role="alert" className="ui-feedback ui-feedback--error">
           {error}
         </p>
       )}
 
       {success && (
-        <p role="status" style={{ color: "#15803d" }}>
+        <p role="status" className="ui-feedback ui-feedback--success">
           {success}
         </p>
       )}
@@ -412,31 +404,21 @@ export default function AcademicDisciplines({
       ) : (
         <ul className="evaluation-list">
           {disciplines.map((discipline) => (
-            <li key={discipline.id} className="evaluation-card">
-              <strong>{discipline.name}</strong>
-              <p>Código: {discipline.code}</p>
-              <p>Curso: {getCourseName(discipline)}</p>
+            <li key={discipline.id} className="evaluation-card ui-card">
+              <h4 className="ui-card__title">{discipline.name}</h4>
 
-              <div
-                style={{
-                  display: "flex",
-                  gap: "12px",
-                  marginTop: "16px",
-                  flexWrap: "wrap",
-                }}
-              >
+              <p className="ui-card__meta">Código: {discipline.code}</p>
+
+              <p className="ui-card__meta">
+                Curso: {getCourseName(discipline)}
+              </p>
+
+              <div className="ui-card__actions">
                 <button
                   type="button"
+                  className="ui-btn ui-btn--primary"
                   onClick={() => handleEdit(discipline)}
                   disabled={saving || deletingDisciplineId !== null}
-                  style={{
-                    flex: "1 1 140px",
-                    width: "auto",
-                    marginTop: 0,
-                    padding: "10px 18px",
-                    borderRadius: "10px",
-                    cursor: "pointer",
-                  }}
                 >
                   Editar
                 </button>
@@ -444,19 +426,9 @@ export default function AcademicDisciplines({
                 {canDeleteDisciplines && (
                   <button
                     type="button"
+                    className="ui-btn ui-btn--danger"
                     onClick={() => void handleDelete(discipline)}
                     disabled={saving || deletingDisciplineId !== null}
-                    style={{
-                      flex: "1 1 140px",
-                      width: "auto",
-                      marginTop: 0,
-                      padding: "10px 18px",
-                      borderRadius: "10px",
-                      backgroundColor: "#fff1f2",
-                      color: "#be123c",
-                      border: "1px solid #fecdd3",
-                      cursor: "pointer",
-                    }}
                   >
                     {deletingDisciplineId === discipline.id
                       ? "Excluindo..."
