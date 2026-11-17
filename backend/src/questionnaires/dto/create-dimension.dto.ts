@@ -1,3 +1,4 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsInt,
   IsNotEmpty,
@@ -17,6 +18,7 @@ export class CreateDimensionDto {
   @IsString()
   description?: string;
 
+  @ApiPropertyOptional({ type: 'integer' })
   @IsOptional()
   @IsInt()
   @Min(0)

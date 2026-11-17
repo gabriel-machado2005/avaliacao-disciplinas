@@ -4,6 +4,7 @@ import EvaluationQuestionnaire, {
   type QuestionnaireResponse,
 } from "./EvaluationQuestionnaire";
 import ProfessorEvaluations from "./ProfessorEvaluations";
+import ImprovementPlans from "./ImprovementPlans";
 import AdministrativePanel from "./AdministrativePanel";
 
 type User = {
@@ -40,6 +41,9 @@ function App() {
   const [message, setMessage] = useState("");
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [professorSection, setProfessorSection] = useState<
+    "evaluations" | "plans"
+  >("evaluations");
 
   const [loggedInUser, setLoggedInUser] = useState<User | null>(() => {
     const storedUser = sessionStorage.getItem("user");
@@ -215,6 +219,7 @@ function App() {
     sessionStorage.removeItem("user");
 
     setLoggedInUser(null);
+    setProfessorSection("evaluations");
     setEvaluations([]);
     setEvaluationsError("");
     setEmail("");
@@ -245,9 +250,33 @@ function App() {
 
           <p>Bem-vindo(a) à Plataforma de Avaliação de Disciplinas.</p>
 
-          <h2>Avaliações das minhas turmas</h2>
+          <nav className="ui-card__actions" aria-label="Área do professor">
+            <button
+              type="button"
+              className={`ui-btn ui-btn--${professorSection === "evaluations" ? "primary" : "secondary"}`}
+              aria-pressed={professorSection === "evaluations"}
+              onClick={() => setProfessorSection("evaluations")}
+            >
+              Avaliações das minhas turmas
+            </button>
+            <button
+              type="button"
+              className={`ui-btn ui-btn--${professorSection === "plans" ? "primary" : "secondary"}`}
+              aria-pressed={professorSection === "plans"}
+              onClick={() => setProfessorSection("plans")}
+            >
+              Meus planos de melhoria
+            </button>
+          </nav>
 
-          <ProfessorEvaluations />
+          {professorSection === "plans" ? (
+            <ImprovementPlans role="PROFESSOR" />
+          ) : (
+            <>
+              <h2>Avaliações das minhas turmas</h2>
+              <ProfessorEvaluations />
+            </>
+          )}
 
           <button type="button" onClick={handleLogout}>
             Sair

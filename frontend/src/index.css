@@ -928,6 +928,54 @@ button.ui-btn:disabled {
   font-variant-numeric: tabular-nums;
 }
 
+/* Filtros e indicadores do painel de análise */
+.evaluation-analysis__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.evaluation-analysis__field,
+.evaluation-analysis__stack {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+}
+
+.evaluation-analysis__stack {
+  gap: 12px;
+}
+
+.evaluation-analysis__metrics {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.evaluation-analysis .ui-status {
+  white-space: normal;
+}
+
+.evaluation-analysis .ui-feedback,
+.evaluation-analysis .ui-card__meta {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .evaluation-analysis__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .evaluation-analysis form.evaluation-card,
+  .evaluation-analysis .evaluation-card.ui-card {
+    padding: 14px;
+  }
+}
+
 @media (max-width: 600px) {
   .results-distribution__row {
     gap: 8px;
@@ -947,6 +995,78 @@ button.ui-btn:disabled {
     font-size: 12px;
   }
 }
+/* Planos de melhoria */
+.improvement-plans__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.improvement-plans__fields,
+.improvement-plans__field {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+}
+
+.improvement-plans__fields {
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.improvement-plans__field input {
+  min-width: 0;
+}
+
+.improvement-plans__field textarea {
+  resize: vertical;
+}
+
+.improvement-plans__section {
+  margin-top: 20px;
+}
+
+.improvement-plans__description {
+  overflow-wrap: anywhere;
+}
+
+.improvement-plans__description dt {
+  font-weight: 600;
+}
+
+.improvement-plans__description dd {
+  margin: 6px 0 14px;
+  white-space: pre-wrap;
+}
+
+.improvement-plans .ui-card__meta,
+.improvement-plans .ui-feedback {
+  overflow-wrap: anywhere;
+}
+
+.improvement-plans__summary {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .improvement-plans__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .improvement-plans form.evaluation-card,
+  .improvement-plans .evaluation-card.ui-card {
+    padding: 14px;
+  }
+}
+
 /* Espacamento entre as dimensoes e os cartoes de resultados */
 
 .results-dimension {

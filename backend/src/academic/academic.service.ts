@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
+import { auditDelete, auditSave } from '../audit/administrative-audit';
 import { User, UserRole } from '../users/entities/user.entity';
 import { CreateAcademicTermDto } from './dto/create-academic-term.dto';
 import { CreateClassGroupDto } from './dto/create-class-group.dto';
@@ -52,7 +53,12 @@ export class AcademicService {
       throw new BadRequestException('Código de curso já cadastrado.');
     }
 
-    return this.courseRepository.save(this.courseRepository.create(dto));
+    return auditSave(
+      this.courseRepository,
+      this.courseRepository.create(dto),
+      'CREATE',
+      'COURSE',
+    );
   }
 
   async updateCourse(id: string, dto: UpdateCourseDto) {
@@ -86,7 +92,7 @@ export class AcademicService {
       course.name = dto.name;
     }
 
-    return this.courseRepository.save(course);
+    return auditSave(this.courseRepository, course, 'UPDATE', 'COURSE');
   }
 
   async deleteCourse(id: string) {
@@ -111,7 +117,7 @@ export class AcademicService {
     }
 
     try {
-      const result = await this.courseRepository.delete(id);
+      const result = await auditDelete(this.courseRepository, 'COURSE', id);
 
       if (result.affected === 0) {
         throw new NotFoundException('Curso não encontrado.');
@@ -161,7 +167,7 @@ export class AcademicService {
       course,
     });
 
-    return this.disciplineRepository.save(discipline);
+    return auditSave(this.disciplineRepository, discipline, 'CREATE', 'DISCIPLINE');
   }
 
   async updateDiscipline(id: string, dto: UpdateDisciplineDto) {
@@ -228,7 +234,7 @@ export class AcademicService {
       discipline.name = dto.name;
     }
 
-    return this.disciplineRepository.save(discipline);
+    return auditSave(this.disciplineRepository, discipline, 'UPDATE', 'DISCIPLINE');
   }
 
   async deleteDiscipline(id: string) {
@@ -253,7 +259,7 @@ export class AcademicService {
     }
 
     try {
-      const result = await this.disciplineRepository.delete(id);
+      const result = await auditDelete(this.disciplineRepository, 'DISCIPLINE', id);
 
       if (result.affected === 0) {
         throw new NotFoundException('Disciplina não encontrada.');
@@ -300,8 +306,11 @@ export class AcademicService {
       throw new BadRequestException('Período letivo já cadastrado.');
     }
 
-    return this.academicTermRepository.save(
+    return auditSave(
+      this.academicTermRepository,
       this.academicTermRepository.create(dto),
+      'CREATE',
+      'ACADEMIC_TERM',
     );
   }
 
@@ -364,7 +373,12 @@ export class AcademicService {
     academicTerm.startDate = startDate;
     academicTerm.endDate = endDate;
 
-    return this.academicTermRepository.save(academicTerm);
+    return auditSave(
+      this.academicTermRepository,
+      academicTerm,
+      'UPDATE',
+      'ACADEMIC_TERM',
+    );
   }
 
   async deleteAcademicTerm(id: string) {
@@ -389,7 +403,7 @@ export class AcademicService {
     }
 
     try {
-      const result = await this.academicTermRepository.delete(id);
+      const result = await auditDelete(this.academicTermRepository, 'ACADEMIC_TERM', id);
 
       if (!result.affected) {
         throw new NotFoundException('Período letivo não encontrado.');
@@ -458,7 +472,7 @@ export class AcademicService {
       academicTerm,
     });
 
-    return this.classGroupRepository.save(classGroup);
+    return auditSave(this.classGroupRepository, classGroup, 'CREATE', 'CLASS_GROUP');
   }
 
   async updateClassGroup(id: string, dto: UpdateClassGroupDto) {
@@ -567,7 +581,7 @@ export class AcademicService {
       classGroup.code = dto.code;
     }
 
-    return this.classGroupRepository.save(classGroup);
+    return auditSave(this.classGroupRepository, classGroup, 'UPDATE', 'CLASS_GROUP');
   }
 
   async deleteClassGroup(id: string) {
@@ -592,7 +606,7 @@ export class AcademicService {
     }
 
     try {
-      const result = await this.classGroupRepository.delete(id);
+      const result = await auditDelete(this.classGroupRepository, 'CLASS_GROUP', id);
 
       if (!result.affected) {
         throw new NotFoundException('Turma não encontrada.');

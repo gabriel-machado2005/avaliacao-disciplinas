@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { Repository } from 'typeorm';
+import { auditSave } from '../audit/administrative-audit';
 import { CreateUserDto } from './dto/create-user.dto';
 import { User, UserRole } from './entities/user.entity';
 
@@ -30,7 +31,12 @@ export class UsersService {
       role: createUserDto.role,
     });
 
-    const savedUser = await this.usersRepository.save(user);
+    const savedUser = await auditSave(
+      this.usersRepository,
+      user,
+      'CREATE',
+      'USER',
+    );
 
     return {
       id: savedUser.id,
@@ -71,6 +77,13 @@ export class UsersService {
       order: {
         name: 'ASC',
       },
+    });
+  }
+
+  findActiveById(id: string) {
+    return this.usersRepository.findOne({
+      where: { id, active: true },
+      select: { id: true, email: true, role: true },
     });
   }
 

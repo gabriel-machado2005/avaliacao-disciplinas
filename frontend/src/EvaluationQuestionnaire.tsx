@@ -34,6 +34,8 @@ type Props = {
   onBack: () => void;
 };
 
+const MAX_SCALE_SELECT_SPAN = 100;
+
 export default function EvaluationQuestionnaire({ data, onBack }: Props) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -164,32 +166,50 @@ export default function EvaluationQuestionnaire({ data, onBack }: Props) {
                 {question.required && " *"}
               </label>
 
-              {question.type === "SCALE" && (
-                <select
-                  id={question.id}
-                  value={answers[question.id] ?? ""}
-                  onChange={(event) =>
-                    updateAnswer(question.id, event.target.value)
-                  }
-                  required={question.required}
-                >
-                  <option value="">Selecione uma nota</option>
+              {question.type === "SCALE" &&
+                ((question.scaleMax ?? 0) - (question.scaleMin ?? 0) >
+                MAX_SCALE_SELECT_SPAN ? (
+                  <input
+                    id={question.id}
+                    type="number"
+                    min={question.scaleMin ?? undefined}
+                    max={question.scaleMax ?? undefined}
+                    step={1}
+                    placeholder={`De ${question.scaleMin} a ${question.scaleMax}`}
+                    value={answers[question.id] ?? ""}
+                    onChange={(event) =>
+                      updateAnswer(question.id, event.target.value)
+                    }
+                    required={question.required}
+                  />
+                ) : (
+                  <select
+                    id={question.id}
+                    value={answers[question.id] ?? ""}
+                    onChange={(event) =>
+                      updateAnswer(question.id, event.target.value)
+                    }
+                    required={question.required}
+                  >
+                    <option value="">Selecione uma nota</option>
 
-                  {Array.from(
-                    {
-                      length: Math.max(
-                        0,
-                        (question.scaleMax ?? 0) - (question.scaleMin ?? 0) + 1,
-                      ),
-                    },
-                    (_, index) => (question.scaleMin ?? 0) + index,
-                  ).map((value) => (
-                    <option key={value} value={value}>
-                      {value}
-                    </option>
-                  ))}
-                </select>
-              )}
+                    {Array.from(
+                      {
+                        length: Math.max(
+                          0,
+                          (question.scaleMax ?? 0) -
+                            (question.scaleMin ?? 0) +
+                            1,
+                        ),
+                      },
+                      (_, index) => (question.scaleMin ?? 0) + index,
+                    ).map((value) => (
+                      <option key={value} value={value}>
+                        {value}
+                      </option>
+                    ))}
+                  </select>
+                ))}
 
               {question.type === "SINGLE_CHOICE" && (
                 <select

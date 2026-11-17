@@ -6,8 +6,10 @@ import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { AcademicModule } from './academic/academic.module';
+import { AdministrativeAuditModule } from './audit/administrative-audit.module';
 import { EvaluationsModule } from './evaluations/evaluations.module';
 import { QuestionnairesModule } from './questionnaires/questionnaires.module';
+import { ImprovementPlansModule } from './improvement-plans/improvement-plans.module';
 
 @Module({
   imports: [
@@ -27,8 +29,8 @@ import { QuestionnairesModule } from './questionnaires/questionnaires.module';
 
         autoLoadEntities: true,
 
-        // Somente enquanto estamos desenvolvendo.
-        synchronize: true,
+        synchronize: false,
+        installExtensions: false,
       }),
     }),
 
@@ -38,9 +40,13 @@ import { QuestionnairesModule } from './questionnaires/questionnaires.module';
 
     AcademicModule,
 
+    AdministrativeAuditModule,
+
     EvaluationsModule,
 
     QuestionnairesModule,
+
+    ImprovementPlansModule,
   ],
   controllers: [AppController],
   providers: [AppService],

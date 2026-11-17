@@ -1,419 +1,221 @@
 # Plataforma de Avaliação de Disciplinas
 
-Sistema web desenvolvido para gerenciar avaliações de disciplinas acadêmicas, permitindo que estudantes respondam questionários e que professores e gestores consultem resultados consolidados.
+Projeto de estágio obrigatório em Ciência da Computação desenvolvido no contexto da UniXS/UNISINOS. A plataforma organiza a avaliação de disciplinas pelos estudantes, permite consultar resultados agregados e acompanha ações de melhoria ao longo dos períodos de avaliação.
 
-O projeto foi desenvolvido como parte das atividades de estágio supervisionado, com foco no desenvolvimento de aplicações web, integração com banco de dados e implementação de regras de negócio.
+## Tecnologias e arquitetura
 
-## Tecnologias utilizadas
+| Camada | Tecnologias e responsabilidades |
+| --- | --- |
+| Frontend | React, TypeScript, Vite e CSS. Interface web responsiva com telas por perfil, gráficos e exportação CSV. |
+| Backend | Node.js, NestJS, TypeScript, TypeORM, PostgreSQL, Passport/JWT e bcrypt. A API REST aplica a autorização, valida os dados e controla a divulgação. |
+| Qualidade | Jest e NestJS Testing no backend, Node Test Runner no frontend, Oxlint e ESLint. A API é documentada com Swagger/OpenAPI. |
 
-### Backend
+O backend organiza o código nos módulos de autenticação, usuários, gestão acadêmica, questionários, avaliações, Planos de Melhoria e auditoria administrativa. O frontend consome a API diretamente. O Git e o GitHub registram o versionamento do projeto.
 
-- Node.js
-- NestJS
-- TypeScript
-- TypeORM
-- PostgreSQL
-- JWT para autenticação
-- Jest para testes automatizados
+## Perfis e permissões
 
-### Frontend
+| Perfil | Acesso |
+| --- | --- |
+| `ADMIN` | Cadastro de usuários pela API. Gestão acadêmica, questionários, avaliações, habilitações, resultados, análise histórica e Planos de Melhoria. Pode excluir cursos, disciplinas, semestres, turmas, períodos de avaliação e avaliações quando as regras de vínculo permitirem. |
+| `COORDINATOR` | Gestão acadêmica, questionários, avaliações e habilitações. Consulta e exportação de resultados, análise histórica e gestão de Planos de Melhoria. A exclusão de questionários é compartilhada com `ADMIN` e respeita os vínculos existentes. |
+| `PROFESSOR` | Consulta as avaliações e os resultados liberados das próprias turmas e pode exportá-los. Consulta os planos atribuídos a ele e atualiza a situação desses planos. |
+| `STUDENT` | Consulta as próprias avaliações e responde ao questionário quando estiver habilitado e o envio estiver disponível. |
 
-- React
-- TypeScript
-- Vite
-- CSS
+O login retorna um JWT com validade de oito horas. Em cada requisição autenticada, o backend consulta a conta no PostgreSQL e usa o perfil atual para autorizar operações. Contas inativas ou removidas perdem o acesso mesmo que o token ainda esteja dentro da validade. O navegador mantém a sessão em `sessionStorage`.
 
-### Ferramentas de desenvolvimento
+## Gestão acadêmica e questionários
 
-- Visual Studio Code
-- Git e GitHub
-- Postman
-- pgAdmin
+- A base acadêmica inclui cursos, disciplinas, semestres e turmas. Cada turma tem uma disciplina, um professor e um semestre.
+- Uma avaliação associa uma turma e um questionário a um período de avaliação. A mesma turma só pode ter uma avaliação por período.
+- Os questionários agrupam perguntas em dimensões. As perguntas podem ser obrigatórias ou opcionais e usam três tipos: escala numérica (`SCALE`), escolha única (`SINGLE_CHOICE`) e resposta discursiva (`TEXT`).
+- Os limites de uma nova escala são inteiros entre −100 e 100, com máximo maior que o mínimo e amplitude de até 100 pontos. A escolha única exige ao menos duas opções e textos de resposta têm limite de 1.000 caracteres.
 
-## Funcionalidades
+## Avaliações, elegibilidade e envio
 
-A plataforma possui quatro perfis de acesso.
+1. Um gestor cadastra o período, cria a avaliação com o mínimo de respostas para divulgação e habilita os estudantes ativos.
+2. O estudante consulta as avaliações atribuídas a ele. O envio exige habilitação, período ativo e dentro da janela de resposta, questionário ativo, respostas obrigatórias preenchidas e valores compatíveis com as perguntas. A API exige ao menos uma resposta por envio, mesmo quando todas as perguntas são opcionais.
+3. A API grava as respostas e marca a elegibilidade como concluída de forma transacional. Cada estudante pode concluir uma avaliação uma única vez.
 
-### Administrador
+## Anonimato e divulgação
 
-- Gerenciamento de cursos, disciplinas, semestres e turmas.
-- Cadastro de períodos de avaliação.
-- Criação e gerenciamento de questionários.
-- Cadastro de dimensões e perguntas.
-- Criação de avaliações para as turmas.
-- Habilitação de estudantes.
-- Consulta dos resultados consolidados.
-- Exportação dos resultados consolidados das avaliações em formato CSV.
+A submissão tem vínculo com a avaliação. A identidade e a situação de conclusão do estudante ficam na elegibilidade, em uma tabela separada. O acesso ao banco e aos backups exige proteção própria, pois eles contêm os dados armazenados pela aplicação, incluindo as respostas originais.
 
-### Coordenador
+A API libera os resultados depois do fim do período e quando a avaliação atinge o mínimo configurado de submissões, que deve ser de pelo menos duas. O mesmo limiar se aplica às respostas de cada pergunta, inclusive às opcionais. A autorização é verificada no backend. Professores só acessam resultados das próprias turmas.
 
-- Acesso às funcionalidades acadêmicas e de gerenciamento de avaliações permitidas ao perfil.
-- Consulta de resultados consolidados.
-- Exportação dos resultados consolidados das avaliações em formato CSV.
+| Estado da pergunta no detalhe | Conteúdo disponível |
+| --- | --- |
+| `AVAILABLE` | Contagem e distribuição para escala e escolha única. Escalas também exibem a média. |
+| `PROTECTED` | Identificação e estado da pergunta. As métricas ficam protegidas por insuficiência de respostas. |
+| `NO_RESPONSES` | Identificação e indicação de que a pergunta ficou sem respostas. |
+| `COMMENTS_PROTECTED` | Identificação e quantidade de respostas discursivas quando o limiar foi atingido. Os comentários individuais permanecem protegidos. |
 
-### Professor
+O CSV é gerado no navegador a partir da resposta de `GET /evaluations/{evaluationId}/results`. Inclui dados da turma, participação e as métricas autorizadas por pergunta. Os campos de métricas protegidas ficam vazios. O arquivo omite identificadores de estudantes e comentários individuais.
 
-- Consulta das avaliações vinculadas às suas turmas.
-- Visualização dos resultados das avaliações autorizadas.
-- Exportação dos resultados consolidados de suas turmas em formato CSV, respeitando as regras de divulgação.
+## Análise de resultados e comparação histórica
 
-### Estudante
+`ADMIN` e `COORDINATOR` podem abrir **Análise de resultados**, selecionar o período principal e, em **Comparar com**, escolher outro período. A API aplica os mesmos filtros de curso, disciplina e professor aos dois períodos. A dimensão filtra as perguntas de escala e a participação usa as avaliações divulgáveis do recorte. A taxa é calculada dividindo o total de submissões pelo total de habilitações.
 
-- Consulta das avaliações disponíveis.
-- Visualização do estado de cada avaliação.
-- Preenchimento de questionários durante o período permitido.
-- Envio das respostas.
-- Identificação das avaliações já respondidas.
+`GET /evaluations/analysis` exige `periodId` e aceita `comparisonPeriodId`, `courseId`, `disciplineId`, `professorId` e `dimensionId`. Os IDs são UUIDs. Os períodos precisam ser distintos e a disciplina deve pertencer ao curso informado, quando ambos forem selecionados.
 
-## Questionários
+A comparação usa perguntas de escala com o mesmo ID, os mesmos limites e respostas divulgáveis nos dois períodos. O limiar é verificado por avaliação e por pergunta antes da agregação. A média é ponderada pelo número de respostas válidas. Períodos abertos ou sem resultados divulgáveis têm estados próprios, e a interface indica quando não há perguntas compatíveis. A API retorna indicadores agregados, sem dados individuais de estudantes ou comentários.
 
-Os questionários são organizados em dimensões e permitem três tipos de perguntas:
+## Planos de Melhoria
 
-- **Escala numérica:** respostas dentro de um intervalo configurado.
-- **Escolha única:** seleção de uma alternativa entre as opções cadastradas.
-- **Resposta aberta:** preenchimento de um campo de texto.
+`ADMIN` e `COORDINATOR` cadastram e editam planos pelo menu **Planos de melhoria**. Um plano inclui disciplina, problema, ação planejada, responsável e prazo. A origem pode ser um período ou uma avaliação da mesma disciplina. A listagem aceita filtros de disciplina, situação, responsável e período de origem.
 
-As perguntas podem ser configuradas como obrigatórias ou opcionais.
+Os planos iniciam como **Pendente** (`PENDING`) e também podem ficar **Em andamento** (`IN_PROGRESS`) ou **Concluída** (`COMPLETED`). O registro inicial e as mudanças de situação ficam no histórico com autor e data. Em **Meus planos de melhoria**, o professor só consulta e muda a situação dos planos atribuídos a ele. A API restringe o acesso ao plano e ao seu histórico.
 
-## Exportação de relatórios
+No detalhe, `ADMIN` e `COORDINATOR` podem escolher um período de acompanhamento que comece após o encerramento da origem. Se a origem indicar uma avaliação específica, somente ela entra na referência inicial. O acompanhamento considera a mesma disciplina, períodos encerrados e perguntas de escala compatíveis com resultados divulgáveis nos dois recortes. A tela exibe médias, quantidades de respostas e variações descritivas.
 
-A plataforma permite exportar os resultados consolidados de avaliações em formato CSV, compatível com ferramentas de planilhas.
+- `GET /improvement-plans/{id}/comparison` aceita `periodId` opcional. Sem esse parâmetro, consulta o período vinculado, se existir. Em caso de indisponibilidade, responde com um estado explicativo, como ausência de origem, período aberto ou perguntas incompatíveis.
+- `PATCH /improvement-plans/{id}/comparison` recebe um `periodId` com comparação disponível ou `null` para retirar o vínculo. Ao alterar a origem, a API remove o vínculo anterior.
+- As métricas são recalculadas a cada consulta. O vínculo é independente da situação do plano e as variações observadas são descritivas.
 
-O relatório inclui informações da disciplina, turma, semestre, participação dos estudantes, dimensões, perguntas, médias e distribuições das respostas.
+## Auditoria administrativa
 
-A exportação utiliza os resultados autorizados pelo backend, respeitando as regras de acesso, encerramento do período e quantidade mínima de respostas.
+A tabela `administrative_audit_events` registra o ID do usuário autenticado, a ação, o tipo e o ID do recurso e a data e hora. Nas operações cobertas, a gravação do evento participa da mesma transação da alteração. Rejeições de autorização, falhas de validação e reversões não geram eventos de sucesso.
 
-Os comentários discursivos individuais e os identificadores dos estudantes não são incluídos no arquivo exportado.
+- **Usuários** — cadastro pela API administrativa. A API atual não possui rota para alterar perfil ou situação de uma conta. Alterações diretas no banco e a criação inicial pelo script de bootstrap estão fora da trilha.
+- **Gestão acadêmica** — criação, edição e exclusão de cursos, disciplinas, semestres e turmas.
+- **Questionários** — criação, edição e exclusão de questionários e cadastro de dimensões e perguntas. A API não oferece edição direta de dimensões e perguntas.
+- **Avaliações** — criação, edição e exclusão de avaliações e períodos, alterações do mínimo de respostas e habilitação ou revogação. Nos eventos de elegibilidade, o recurso registrado é a avaliação. IDs de estudantes e de habilitações ficam fora desses eventos.
+- **Planos de Melhoria** — criação, edição e alterações do vínculo de acompanhamento, incluindo a remoção decorrente de uma mudança de origem. As transições de situação continuam registradas no histórico próprio, inclusive quando realizadas pelo professor autorizado.
 
-## Regras de negócio
+A trilha não registra senhas, hashes, tokens, respostas, comentários individuais ou corpos de requisição. A inspeção ocorre pelo acesso autorizado ao PostgreSQL. A API não oferece listagem de eventos de auditoria.
 
-O sistema implementa validações para manter a consistência das avaliações.
+## Instalação local
 
-Entre as principais regras estão:
-
-- Uma turma não pode possuir avaliações duplicadas no mesmo período.
-- Apenas estudantes ativos e habilitados podem responder.
-- Cada estudante pode concluir uma avaliação uma única vez.
-- As respostas são aceitas somente durante o período permitido.
-- Perguntas obrigatórias precisam ser respondidas.
-- Valores e alternativas enviados devem respeitar as configurações do questionário.
-- Os resultados somente são liberados após o encerramento do período e quando a quantidade mínima de respostas é atingida.
-- Professores podem consultar resultados apenas das turmas às quais estão vinculados.
-
-As submissões são armazenadas sem associação direta ao identificador do estudante. O controle de conclusão é realizado separadamente, por meio da elegibilidade.
-
-## Estrutura do projeto
-
-```text
-avaliacao-disciplinas/
-├── backend/
-│   ├── src/
-│   │   ├── academic/
-│   │   ├── auth/
-│   │   ├── evaluations/
-│   │   ├── questionnaires/
-│   │   ├── scripts/
-│   │   │   └── create-first-admin.ts
-│   │   └── users/
-│   └── .env.example
-├── frontend/
-│   └── src/
-├── .gitignore
-└── README.md
-```
-
-## Requisitos para execução
-
-Para executar o projeto localmente, são necessários:
-
-- Node.js e npm.
-- PostgreSQL.
-- Banco de dados e usuário configurados para a aplicação.
-- Variáveis de ambiente do backend configuradas.
-
-As credenciais do banco de dados e os segredos de autenticação devem permanecer fora do controle de versão.
-
-## Instalação e execução
-
-Clone o repositório:
-
-```bash
-git clone https://github.com/gabriel-machado2005/avaliacao-disciplinas.git
-cd avaliacao-disciplinas
-```
-
-### Backend
-
-Na pasta principal do projeto, instale as dependências do backend:
-
-```bash
-npm --prefix backend install
-```
-
-### Configuração das variáveis de ambiente
-
-O backend utiliza variáveis de ambiente para configurar a conexão com o PostgreSQL e a autenticação JWT.
-
-Na pasta `backend`, crie o arquivo `.env` a partir do modelo fornecido:
+Use Node.js 24 com npm e PostgreSQL. A versão do PostgreSQL usada na validação de recuperação foi a 18.6.
 
 ```powershell
+git clone https://github.com/gabriel-machado2005/avaliacao-disciplinas.git
+cd avaliacao-disciplinas
+npm --prefix backend ci
+npm --prefix frontend ci
 Copy-Item backend/.env.example backend/.env
 ```
 
-Abra o arquivo `.env` e configure as variáveis:
+Para executar a aplicação, use um banco PostgreSQL local com o esquema da plataforma já preparado. Configure um usuário com acesso a esse banco e substitua os valores ilustrativos em `backend/.env`. Mantenha esse arquivo fora do Git.
 
-```dotenv
-DB_HOST=localhost
-DB_PORT=5432
-DB_USERNAME=seu_usuario
-DB_PASSWORD=sua_senha
-DB_DATABASE=avaliacao_disciplinas
-JWT_SECRET=substitua-por-um-segredo-longo-e-aleatorio
-```
+| Variável | Valor ou finalidade |
+| --- | --- |
+| `DB_HOST` | Host do PostgreSQL. Em desenvolvimento local, `localhost`. |
+| `DB_PORT` | Porta do PostgreSQL, normalmente `5432`. |
+| `DB_DATABASE` | Nome do banco já preparado para a instalação. |
+| `DB_USERNAME`, `DB_PASSWORD` | Credenciais do PostgreSQL, fornecidas localmente. |
+| `JWT_SECRET` | Segredo de assinatura JWT, longo e aleatório. |
+| `PORT` | Porta da API. O padrão é `3000`. |
+| `NODE_ENV` | Em `production`, a documentação Swagger fica desabilitada. |
 
-Antes de iniciar a aplicação, certifique-se de que:
+### Preparação do esquema PostgreSQL
 
-- O PostgreSQL esteja instalado e em execução.
-- O banco de dados informado em `DB_DATABASE` já exista.
-- O usuário configurado tenha permissão para acessar o banco.
-- O valor de `JWT_SECRET` tenha sido substituído por um segredo forte e aleatório.
+O [AppModule](backend/src/app.module.ts) configura o TypeORM com `synchronize: false` e `installExtensions: false` em todos os ambientes. Prepare o esquema completo, incluindo a tabela `administrative_audit_events`, e disponibilize a extensão `uuid-ossp` usada na geração de UUIDs antes de iniciar o backend.
 
-O arquivo `.env` contém configurações sensíveis e não deve ser enviado ao GitHub. Ele está incluído no `.gitignore`.
+**Limitação de uma instalação nova** — O repositório ainda não inclui migrações versionadas, um esquema SQL completo ou um script para provisionar um banco vazio. Os arquivos atuais permitem configurar a conexão, executar o backend com um banco previamente preparado e criar a primeira conta administrativa. O script de criação dessa conta pressupõe o esquema existente. Os backups com dados reais são reservados à recuperação autorizada e ficam fora dos materiais de instalação e do Git.
 
-O arquivo `.env.example` contém apenas valores ilustrativos e pode ser versionado normalmente.
+### Primeiro administrador
 
-**Observação:** durante o desenvolvimento, o TypeORM utiliza `synchronize: true`, permitindo a sincronização automática das entidades com o banco de dados. Essa configuração não deve ser utilizada em produção sem uma estratégia adequada de migrações.
-
-### Criação do primeiro administrador
-
-Em uma instalação nova, é necessário cadastrar um administrador inicial para acessar a plataforma e gerenciar os demais usuários.
-
-Como a rota de cadastro de usuários exige autenticação com perfil `ADMIN`, o projeto disponibiliza um script de inicialização.
-
-Antes de executá-lo, configure o PostgreSQL e as variáveis de ambiente do backend.
-
-Na pasta `backend`, compile o projeto:
+Depois de preparar o esquema, execute o script no diretório `backend`. O comando usa o banco configurado em `.env` e cria um administrador somente se ainda não existir uma conta `ADMIN`.
 
 ```powershell
 cd backend
 npm run build
-```
-
-Em seguida, informe os dados do administrador inicial no PowerShell:
-
-```powershell
-$env:BOOTSTRAP_ADMIN_NAME = Read-Host "Nome do administrador"
-$env:BOOTSTRAP_ADMIN_EMAIL = Read-Host "E-mail do administrador"
-
-$senha = Read-Host "Senha do administrador (mínimo de 12 caracteres)" -AsSecureString
-$env:BOOTSTRAP_ADMIN_PASSWORD = [System.Net.NetworkCredential]::new("", $senha).Password
-```
-
-Execute o script:
-
-```powershell
-node .\dist\scripts\create-first-admin.js
-```
-
-Após a execução, remova as variáveis temporárias da sessão:
-
-```powershell
-Remove-Item Env:BOOTSTRAP_ADMIN_NAME, Env:BOOTSTRAP_ADMIN_EMAIL, Env:BOOTSTRAP_ADMIN_PASSWORD -ErrorAction SilentlyContinue
-Remove-Variable senha -ErrorAction SilentlyContinue
-```
-
-Depois, retorne à pasta principal do projeto:
-
-```powershell
+$env:BOOTSTRAP_ADMIN_NAME = Read-Host 'Nome do administrador'
+$env:BOOTSTRAP_ADMIN_EMAIL = Read-Host 'E-mail do administrador'
+$senha = Read-Host 'Senha do administrador (mínimo de 12 caracteres)' -AsSecureString
+$env:BOOTSTRAP_ADMIN_PASSWORD = [System.Net.NetworkCredential]::new('', $senha).Password
+try {
+    node .\dist\scripts\create-first-admin.js
+} finally {
+    Remove-Item Env:BOOTSTRAP_ADMIN_NAME, Env:BOOTSTRAP_ADMIN_EMAIL, Env:BOOTSTRAP_ADMIN_PASSWORD -ErrorAction SilentlyContinue
+    Remove-Variable senha -ErrorAction SilentlyContinue
+}
 cd ..
 ```
 
-O script verifica se já existe algum usuário com perfil `ADMIN`. Se existir, nenhuma nova conta será criada.
+### Executar a aplicação
 
-Se não houver administradores, o script utilizará os dados informados para criar o primeiro usuário, armazenando a senha com hash bcrypt.
+Com o banco preparado e as variáveis de ambiente configuradas, execute os comandos em terminais separados a partir da raiz do repositório.
 
-Esse procedimento deve ser executado apenas durante a configuração inicial, em um ambiente controlado.
-
-Depois da criação, o administrador poderá acessar a plataforma com o e-mail e a senha configurados. O cadastro de outros usuários está disponível pela rota autenticada POST /users, acessível exclusivamente ao perfil ADMIN.
-
-**Importante:** não coloque senhas reais no README, no `.env.example` ou em arquivos enviados ao GitHub.
-
-Depois, inicie o servidor:
-
-```bash
+```powershell
 npm --prefix backend run start:dev
-```
-
-O backend utiliza, na configuração local de desenvolvimento, o endereço:
-
-```text
-http://localhost:3000
-```
-
-### Documentação da API
-
-O backend disponibiliza documentação interativa utilizando Swagger/OpenAPI.
-
-Com o servidor em execução no ambiente de desenvolvimento, acesse:
-
-http://localhost:3000/api/docs
-
-A interface permite consultar os endpoints disponíveis, seus parâmetros e os esquemas documentados da API.
-
-A documentação foi configurada para não ser disponibilizada quando `NODE_ENV=production`.
-
-### Frontend
-
-Em outro terminal, aberto na pasta principal do projeto, instale as dependências do frontend:
-
-```bash
-npm --prefix frontend install
-```
-
-Inicie a interface:
-
-```bash
 npm --prefix frontend run dev
 ```
 
-O frontend utiliza, na configuração local de desenvolvimento, o endereço:
+Abra o [frontend](http://localhost:5173) no navegador. A configuração local do frontend usa a API em `http://localhost:3000`, e o backend autoriza via CORS a origem `http://localhost:5173`. Se mudar esses endereços, ajuste os pontos de configuração correspondentes.
 
-```text
-http://localhost:5173
-```
+### Documentação da API
 
-O backend e o frontend precisam estar em execução para utilizar a aplicação completa.
+Em desenvolvimento, abra o [Swagger UI](http://localhost:3000/api/docs) ou o [documento OpenAPI em JSON](http://localhost:3000/api/docs-json). Faça login em `POST /auth/login`, copie o `accessToken` e informe apenas o token em **Authorize** no Swagger UI. O esquema Bearer se aplica às rotas protegidas. O login e a rota raiz são públicos.
 
-## Testes automatizados
+A documentação apresenta os corpos, filtros, UUIDs, valores enumerados e códigos de resposta por operação. Os erros retornam `statusCode` e `message`. Erros de validação podem retornar uma lista de mensagens. Em `NODE_ENV=production`, a interface e o JSON ficam indisponíveis.
 
-O backend possui testes unitários desenvolvidos com Jest e NestJS Testing.
+No Passo 508, a validação do documento OpenAPI 3.0.0 conferiu 55 operações, 26 esquemas, os filtros analíticos e o Bearer nas 53 operações protegidas. A verificação HTTP foi executada com uma dependência de banco simulada.
 
-Os testes abrangem os módulos de:
+## Testes, builds e lint
 
-- Autenticação.
-- Usuários.
-- Gerenciamento acadêmico.
-- Questionários.
-- Avaliações.
+Execute a partir da raiz do repositório.
 
-Para executar todos os testes:
-
-```bash
+```powershell
 npm --prefix backend test -- --runInBand
-```
-
-Resultado registrado durante a validação do projeto:
-
-```text
-Test Suites: 12 passed, 12 total
-Tests:       263 passed, 263 total
-```
-
-Os testes unitários utilizam dependências simuladas para verificar os comportamentos dos serviços e controllers.
-
-## Build de produção
-
-Para verificar a compilação do backend:
-
-```bash
+npm --prefix frontend test
 npm --prefix backend run build
-```
-
-Para gerar a versão de produção do frontend:
-
-```bash
 npm --prefix frontend run build
+npm --prefix backend run lint
+npm --prefix frontend run lint
 ```
 
-Ambas as compilações foram executadas com sucesso durante a validação do projeto.
+Os testes unitários do backend usam dependências simuladas. Os testes do frontend verificam o conteúdo e a privacidade do CSV. As suítes de `npm --prefix backend run test:e2e -- --runInBand` usam o `AppModule` e a configuração real do TypeORM. Antes de executá-las, aponte todas as variáveis `DB_*` para uma instância descartável com o esquema já preparado.
 
-## Segurança e privacidade
+A suíte de auditoria roda quando `UNIXS_AUDIT_TEST_DATA_DIRECTORY` aponta para o diretório de dados da instância de teste. Ela confirma o diretório, o endereço `127.0.0.1:55487` e o banco `unixs_audit_test` antes de iniciar a aplicação com o usuário de teste `unixs_audit_test`. Os testes usam contas e dados fictícios.
 
-A aplicação utiliza autenticação JWT e controle de permissões conforme o perfil do usuário.
+Na validação final do Passo 509.2, foram aprovados 402 testes unitários do backend em 17 suítes, sete testes HTTP em duas suítes na cópia restaurada e três testes do frontend. A integração confirmou a identidade dos autores em requisições simultâneas, o escopo por perfil, a ausência de eventos em rejeições, a proteção dos dados e a reversão de uma alteração quando a auditoria falha.
 
-O acesso aos resultados segue regras relacionadas ao perfil autorizado, ao encerramento do período de avaliação e à quantidade mínima de respostas.
+## Backup e restauração do PostgreSQL
 
-O sistema também separa o registro de conclusão da avaliação do armazenamento das respostas, buscando reduzir a associação direta entre os estudantes e suas submissões.
+Use `pg_dump` e `pg_restore` em versão compatível com o servidor. O procedimento validado em 17/11/2026 usou PostgreSQL 18.6.
 
-## Sobre o projeto
+1. Crie um diretório de acesso restrito fora do Git e escolha um nome único para o arquivo. Conecte à origem somente para leitura e confirme o banco e a porta antes do dump. Use `pg_dump --format=custom --file=<novo-arquivo.backup.partial>` com destino exclusivo e verifique o código de saída.
+2. Confira o catálogo com `pg_restore --list <arquivo>` e a leitura integral com `pg_restore --file=NUL <arquivo>` no Windows. Registre o tamanho e o SHA-256 com `Get-FileHash -Algorithm SHA256`. Após essas verificações, renomeie o arquivo temporário para `.backup`, preservando os backups anteriores.
+3. Inicialize uma instância PostgreSQL temporária, com porta diferente e diretório de dados próprio, acessível apenas localmente. Crie um banco vazio nela e confirme a identidade com `SELECT current_database(), inet_server_port(), current_setting('data_directory');`. Interrompa a operação se qualquer valor divergir do destino planejado.
+4. Execute a restauração em transação única, com `pg_restore --exit-on-error --single-transaction --no-owner --no-acl --dbname=<conexão-do-destino-isolado> <arquivo.backup>`. Os proprietários e privilégios foram dispensados no teste de restauração. Use um prompt para credenciais ou um mecanismo de autenticação protegido.
+5. Compare o esquema, as contagens por tabela e a integridade dos relacionamentos antes de executar testes que gravem dados. Na validação, `pg_dump --snapshot` e a comparação usaram o mesmo snapshot exportado de uma transação somente leitura, e o conteúdo das tabelas foi conferido por hash. Para o teste funcional, conecte o backend somente à cópia isolada com `synchronize: false` e `installExtensions: false`. Encerre a instância isolada depois das verificações.
 
-Projeto acadêmico desenvolvido durante o estágio supervisionado em Ciência da Computação, com o objetivo de aplicar conhecimentos de desenvolvimento web, APIs REST, modelagem de dados, autenticação, testes automatizados e versionamento de código.
+### Validação final de 17/11/2026
 
-## Backup e recuperação do banco de dados
+| Item conferido | Resultado |
+| --- | --- |
+| Backup | `avaliacao_disciplinas_20261117_114127_3a759ff0.backup` |
+| Diretório | `C:\Projetos\backups-avaliacao-disciplinas\validacao_20261117_114127_3a759ff0` |
+| Snapshot e tamanho | 11:41:28 no horário de Brasília, 41.374 bytes |
+| SHA-256 | `C2266C5028D3097FBF46690FB34E74A8709CACEE593A52E2B812917C1BA59AE1` |
+| Destino da restauração | PostgreSQL isolado em `127.0.0.1:55487`, banco temporário `unixs_audit_test` |
+| Esquema e registros | 16 tabelas e 63 registros restaurados. Esquema, contagens e conteúdo conferidos com a origem. |
+| Relacionamentos | 21 chaves estrangeiras validadas e zero referências órfãs |
+| Auditoria administrativa | A tabela foi restaurada com zero eventos. Os testes com dados fictícios na cópia isolada confirmaram gravação de eventos e ausência de eventos em requisições rejeitadas. |
 
-O projeto utiliza PostgreSQL e permite realizar backups por meio das ferramentas oficiais `pg_dump` e `pg_restore`.
+O backup e o `relatorio-validacao.md` foram preservados no diretório indicado, fora do Git. O catálogo e a leitura integral passaram nas verificações, e o SHA-256 foi reconferido após a restauração. O relatório contém apenas evidências agregadas. O backup anterior foi preservado.
 
-### Criar um backup
+## Matriz de requisitos e evidências
 
-Em ambiente Windows com PostgreSQL 18, execute no PowerShell:
+A matriz segue as seções 1 a 11 das quatro páginas da especificação original da UniXS. A entrega acadêmica é executável localmente com um banco previamente preparado. A implantação institucional depende da configuração de comunicação segura, do controle de mudanças no banco e da validação de capacidade no ambiente de destino.
 
-```powershell
-$backupDir = "C:\Projetos\backups-avaliacao-disciplinas"
-
-New-Item -ItemType Directory -Path $backupDir -Force | Out-Null
-
-$backupFile = Join-Path $backupDir (
-    "avaliacao_disciplinas_" +
-    (Get-Date -Format "yyyyMMdd_HHmmss") +
-    ".backup"
-)
-
-& "C:\Program Files\PostgreSQL\18\bin\pg_dump.exe" `
-    -h localhost `
-    -p 5432 `
-    -U postgres `
-    -d avaliacao_disciplinas `
-    -F c `
-    --no-owner `
-    --no-acl `
-    -W `
-    -f $backupFile
-```
-
-A ferramenta solicitará a senha do usuário PostgreSQL.
-
-O arquivo gerado utiliza o formato personalizado do PostgreSQL (`.backup`).
-
-### Verificar o arquivo
-
-Para listar os objetos armazenados no backup:
-
-```powershell
-& "C:\Program Files\PostgreSQL\18\bin\pg_restore.exe" `
-    --list `
-    "CAMINHO_DO_ARQUIVO.backup"
-```
-
-Para verificar a leitura completa e a geração da representação SQL:
-
-```powershell
-& "C:\Program Files\PostgreSQL\18\bin\pg_restore.exe" `
-    --file=NUL `
-    "CAMINHO_DO_ARQUIVO.backup"
-```
-
-O código de saída `0` indica que o processamento terminou sem erros detectados.
-
-### Recuperação dos dados
-
-A recuperação deve ser realizada inicialmente em um banco de dados de teste, separado do banco original.
-
-O procedimento consiste em:
-
-1. Criar um banco de dados PostgreSQL vazio para restauração.
-2. Utilizar `pg_restore` apontando para esse banco de teste.
-3. Conferir a existência das tabelas, relacionamentos e registros.
-4. Verificar o funcionamento da aplicação com os dados recuperados.
-
-A leitura do arquivo não substitui uma restauração completa de teste.
-
-### Cuidados de segurança
-
-- Nunca enviar arquivos de backup ao GitHub.
-- Não armazenar senhas nos comandos ou na documentação.
-- Manter os backups em local protegido, com acesso restrito.
-- Preservar cópias adicionais em armazenamento seguro.
-- Testar periodicamente a recuperação dos dados.
-- Não restaurar backups diretamente sobre o banco em uso sem planejamento prévio.
-
-Durante o desenvolvimento, foi criado e verificado um backup do banco `avaliacao_disciplinas` utilizando PostgreSQL 18.6.
+| Seção e requisito | Classificação | Evidência ou limite |
+| --- | --- | --- |
+| 1–2 · Coleta, análise e questionários configuráveis | Atendido e verificado | Fluxo integrado de configuração, envio, consulta agregada e comparação. |
+| 3, 10 e 11 · Perfis, painéis e controle de acesso | Atendido e verificado | Guards, escopo por vínculo e testes de revalidação do perfil e de contas inativas ou excluídas. |
+| 4 e 10 · Gestão acadêmica, períodos e questionários | Atendido e verificado | Cadastro de disciplinas, turmas e professores, organização por dimensões e validação de escalas. O cadastro satisfaz a alternativa de cadastro ou importação. |
+| 4 e 10 · Elegibilidade, janela de envio e submissão única | Atendido e verificado | Testes de acesso, período, respostas obrigatórias, valores válidos e bloqueio de duplicidade. |
+| 5 e 10 · Separação da identidade e divulgação | Atendido e verificado | Entidades separadas, mínimo configurável por avaliação aplicado também a cada pergunta e testes de proteção de comentários. |
+| 6, 9 e 10 · Resultados por perfil, gráficos e CSV | Atendido e verificado | Consulta por turma para o professor, gráficos de indicadores agregados, testes de métricas autorizadas e campos protegidos no CSV. |
+| 7 e 10 · Filtros da coordenação e histórico | Atendido e verificado | Testes de filtros, período, limiar, médias ponderadas e compatibilidade das perguntas. |
+| 8 e 10 · Ações e acompanhamento de melhoria | Atendido e verificado | Planos, atribuição, histórico e comparação descritiva com resultados posteriores. Testes verificam escopo, origem, período e divulgação. |
+| 11 · Auditoria administrativa | Atendido e verificado | Trilha persistente das operações HTTP administrativas cobertas. Integração isolada verificou autoria, metadados, proteção, rejeições e reversão. Bootstrap e operações externas à API possuem o limite descrito na seção de auditoria. |
+| 11 · Comunicação segura | Não atendido | O ambiente local usa HTTP. HTTPS para frontend e API é requisito para implantação institucional. |
+| 11 · Responsividade, usabilidade e acessibilidade | Parcialmente atendido | Layout responsivo e mensagens nas telas principais, com validações em desktop e celular. A cobertura de navegadores e a auditoria de acessibilidade ainda são limitadas. |
+| 11 · Capacidade para picos de acesso | Parcialmente atendido | O envio usa transações e a análise agrega métricas em SQL. Há testes de regras e concorrência de autoria. A capacidade com volume de encerramento ainda não foi medida em teste de carga. |
+| 11 · Arquitetura, testes, versionamento e API | Atendido e verificado | Separação de camadas, Git, suítes automatizadas e OpenAPI gerado e conferido. |
+| 11 · Backup e restauração | Atendido e verificado | Restauração isolada final de 17/11/2026 com 16 tabelas e teste funcional da auditoria na cópia. |
+| Implantação institucional · Migrations versionadas | Não atendido | A sincronização automática e a instalação automática de extensões estão desabilitadas. O repositório ainda carece de um procedimento versionado para criar o esquema e aplicar suas alterações. |
+| 6 · Agrupamento de comentários com processamento de linguagem natural | Melhoria futura | A especificação o descreve como complementar. A divulgação atual usa somente a contagem autorizada de respostas discursivas. |
+| Evolução analítica · Equivalência entre versões de questionários | Melhoria futura | A comparação atual exige o mesmo ID de pergunta e escala compatível. A composição das turmas pode mudar entre os recortes comparados. |

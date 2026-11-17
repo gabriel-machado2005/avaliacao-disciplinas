@@ -14,6 +14,7 @@ import { EvaluationEligibility } from './entities/evaluation-eligibility.entity'
 import { Evaluation } from './entities/evaluation.entity';
 import { Submission } from './entities/submission.entity';
 import { EvaluationPeriod } from './entities/evaluation-period.entity';
+import { ImprovementPlan } from '../improvement-plans/entities/improvement-plan.entity';
 import { Questionnaire } from '../questionnaires/entities/questionnaire.entity';
 import { ClassGroup } from '../academic/entities/class-group.entity';
 
@@ -93,6 +94,15 @@ describe('EvaluationsService', () => {
   it('deve criar o serviço de avaliações corretamente', () => {
     expect(service).toBeDefined();
   });
+
+  it.each([UserRole.PROFESSOR, UserRole.STUDENT])(
+    'deve bloquear consultas analíticas diretas pelo perfil %s',
+    (role) => {
+      expect(() => service.getAnalysis({ periodId: 'period-id-1' }, { role }))
+        .toThrow(ForbiddenException);
+      expect(dataSourceMock.transaction).not.toHaveBeenCalled();
+    },
+  );
 
   describe('Períodos de avaliação', () => {
     it('deve cadastrar um período de avaliação válido', async () => {
@@ -818,6 +828,8 @@ describe('EvaluationsService', () => {
 
     const transactionManagerMock = {
       getRepository: jest.fn(),
+      findOne: jest.fn(),
+      existsBy: jest.fn(),
     };
 
     beforeEach(() => {
@@ -1084,6 +1096,37 @@ describe('EvaluationsService', () => {
 
       expect(transactionEvaluationRepositoryMock.save).not.toHaveBeenCalled();
     });
+
+    it.each([true, false])(
+      'deve permitir mudar a turma de uma avaliação vinculada a plano somente na mesma disciplina (%s)',
+      async (sameDiscipline) => {
+        transactionManagerMock.findOne.mockResolvedValue({
+          disciplineId: 'disciplina-1',
+        });
+        transactionManagerMock.existsBy.mockResolvedValue(sameDiscipline);
+
+        const update = service.updateEvaluation(evaluationId, {
+          classGroupId: 'class-group-id-2',
+        });
+        if (sameDiscipline) {
+          await expect(update).resolves.toMatchObject({
+            classGroup: { id: 'class-group-id-2' },
+          });
+        } else {
+          await expect(update).rejects.toThrow(ConflictException);
+          expect(transactionEvaluationRepositoryMock.save).not.toHaveBeenCalled();
+        }
+
+        expect(transactionManagerMock.findOne).toHaveBeenCalledWith(
+          ImprovementPlan,
+          expect.objectContaining({ where: { originEvaluationId: evaluationId } }),
+        );
+        expect(transactionManagerMock.existsBy).toHaveBeenCalledWith(ClassGroup, {
+          id: 'class-group-id-2',
+          discipline: { id: 'disciplina-1' },
+        });
+      },
+    );
 
     it('deve rejeitar troca para período inativo', async () => {
       transactionPeriodRepositoryMock.findOne.mockResolvedValue({
@@ -1386,6 +1429,7 @@ describe('EvaluationsService', () => {
       transactionEligibilityRepositoryMock.findOne.mockResolvedValue({
         id: eligibilityId,
         completed: false,
+        evaluation: { id: 'evaluation-id-1' },
       });
 
       transactionEligibilityRepositoryMock.delete.mockResolvedValue({
@@ -1403,8 +1447,11 @@ describe('EvaluationsService', () => {
       expect(transactionEligibilityRepositoryMock.findOne).toHaveBeenCalledWith(
         {
           where: { id: eligibilityId },
+          relations: { evaluation: true },
+          select: { id: true, completed: true, evaluation: { id: true } },
           lock: {
             mode: 'pessimistic_write',
+            tables: ['evaluation_eligibilities'],
           },
         },
       );
@@ -2405,6 +2452,7 @@ describe('EvaluationsService', () => {
         id: 'question-scale',
         text: 'Avalie a organização.',
         type: QuestionType.SCALE,
+        status: 'AVAILABLE',
         responses: 3,
         average: 3.67,
         distribution: {
@@ -2424,14 +2472,17 @@ describe('EvaluationsService', () => {
         id: 'question-text',
         text: 'Deixe um comentário.',
         type: QuestionType.TEXT,
-        responses: 2,
-        comments: ['Ótimas aulas.', 'Mais exemplos práticos.'],
+        status: 'PROTECTED',
       });
+      expect(JSON.stringify(result)).not.toMatch(
+        /comments|Ótimas aulas|Mais exemplos práticos/,
+      );
 
       expect(result.dimensions[1].questions[1]).toEqual({
         id: 'question-choice',
         text: 'Como foi a metodologia?',
         type: QuestionType.SINGLE_CHOICE,
+        status: 'AVAILABLE',
         responses: 3,
         distribution: {
           Boa: 2,
@@ -2452,6 +2503,140 @@ describe('EvaluationsService', () => {
           question: true,
         },
       });
+    });
+
+    it.each([
+      [QuestionType.SCALE, { scaleValue: 5 }],
+      [QuestionType.SINGLE_CHOICE, { choiceValue: 'Opção restrita' }],
+      [
+        QuestionType.TEXT,
+        { textValue: 'Comentário que identifica o estudante' },
+      ],
+    ] as const)(
+      'distingue perguntas opcionais abaixo do mínimo de perguntas sem respostas (%s)',
+      async (type, payload) => {
+        const questions = [
+          {
+            id: 'restricted',
+            text: 'Pergunta opcional com resposta',
+            type,
+            required: false,
+            order: 1,
+          },
+          {
+            id: 'empty',
+            text: 'Pergunta opcional sem resposta',
+            type,
+            required: false,
+            order: 2,
+          },
+        ];
+        evaluationRepositoryMock.findOne.mockResolvedValue({
+          ...createResultsEvaluationFixture(),
+          questionnaire: {
+            dimensions: [{ id: 'dim', name: 'Dimensão', order: 1, questions }],
+          },
+        });
+        const unanswered = { scaleValue: null, choiceValue: null, textValue: null };
+        resultsAnswerRepositoryMock.find.mockResolvedValue([
+          { ...unanswered, ...payload, question: { id: 'restricted' } },
+          { ...unanswered, question: { id: 'restricted' } },
+          { ...unanswered, textValue: '   ', question: { id: 'restricted' } },
+        ]);
+
+        const result = await service.getResults(evaluationId, adminRequester);
+        expect(result.participation.responses).toBe(5);
+        expect(result.dimensions[0].questions).toEqual([
+          {
+            id: questions[0].id,
+            text: questions[0].text,
+            type,
+            status: 'PROTECTED',
+          },
+          {
+            id: questions[1].id,
+            text: questions[1].text,
+            type,
+            status: 'NO_RESPONSES',
+          },
+        ]);
+      },
+    );
+
+    it('divulga somente o total dos comentários quando a pergunta atinge o mínimo', async () => {
+      const question = {
+        id: 'text-above-minimum',
+        text: 'O que pode melhorar?',
+        type: QuestionType.TEXT,
+        order: 1,
+      };
+      evaluationRepositoryMock.findOne.mockResolvedValue({
+        ...createResultsEvaluationFixture(),
+        questionnaire: {
+          dimensions: [
+            { id: 'dim', name: 'Dimensão', order: 1, questions: [question] },
+          ],
+        },
+      });
+      resultsAnswerRepositoryMock.find.mockResolvedValue(
+        ['Comentário de Ana', 'Comentário de João', 'Comentário de Maria', '   '].map(
+          (textValue) => ({
+            question: { id: question.id },
+            scaleValue: null,
+            choiceValue: null,
+            textValue,
+          }),
+        ),
+      );
+
+      const result = await service.getResults(evaluationId, adminRequester);
+      expect(result.dimensions[0].questions).toEqual([
+        {
+          id: question.id,
+          text: question.text,
+          type: question.type,
+          status: 'COMMENTS_PROTECTED',
+          responses: 3,
+        },
+      ]);
+      expect(JSON.stringify(result)).not.toMatch(/comments|textValue|Comentário de/);
+    });
+
+    it('calcula a média de escala legada ampla usando só os valores observados na distribuição', async () => {
+      const question = {
+        id: 'legacy-scale',
+        text: 'Avalie a disciplina.',
+        type: QuestionType.SCALE,
+        order: 1,
+        scaleMin: -1000,
+        scaleMax: 1000,
+      };
+      evaluationRepositoryMock.findOne.mockResolvedValue({
+        ...createResultsEvaluationFixture(),
+        questionnaire: {
+          dimensions: [{ id: 'dim', name: 'Dimensão', order: 1, questions: [question] }],
+        },
+      });
+      resultsAnswerRepositoryMock.find.mockResolvedValue(
+        [-500, 1000, 1000].map((scaleValue) => ({
+          question: { id: question.id },
+          scaleValue,
+        })),
+      );
+
+      const result = await service.getResults(evaluationId, adminRequester);
+
+      expect(result.dimensions[0].questions).toEqual([
+        {
+          id: question.id,
+          text: question.text,
+          type: QuestionType.SCALE,
+          status: 'AVAILABLE',
+          responses: 3,
+          average: 500,
+          distribution: { '-500': 1, '1000': 2 },
+        },
+      ]);
     });
 
     it('deve permitir que o professor responsável consulte os resultados', async () => {

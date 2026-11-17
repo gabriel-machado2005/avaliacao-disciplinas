@@ -11,6 +11,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
+import type { CreateQuestionDto } from './dto/create-question.dto';
+
 describe('QuestionnairesService', () => {
   let service: QuestionnairesService;
 
@@ -547,6 +549,53 @@ describe('QuestionnairesService', () => {
 
       expect(questionRepositoryMock.save).not.toHaveBeenCalled();
     });
+
+    it.each([
+      [null, 5],
+      [1, null],
+      [1.5, 5],
+      [10, 1],
+      [-101, 0],
+      [0, 101],
+      [-100, 100],
+      [-2_000_000_000, 2_000_000_000],
+    ])(
+      'deve rejeitar limites inválidos ou amplos para escala (%s a %s)',
+      async (scaleMin, scaleMax) => {
+        dimensionRepositoryMock.findOne.mockResolvedValue(dimension);
+        const dto = {
+          text: 'Avalie a disciplina.',
+          type: QuestionType.SCALE,
+          scaleMin,
+          scaleMax,
+        } as CreateQuestionDto;
+
+        await expect(service.createQuestion(dimensionId, dto)).rejects.toThrow(
+          BadRequestException,
+        );
+        expect(questionRepositoryMock.create).not.toHaveBeenCalled();
+        expect(questionRepositoryMock.save).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each([[-100, 0], [0, 100]])(
+      'deve aceitar a amplitude máxima de 100 pontos (%s a %s)',
+      async (scaleMin, scaleMax) => {
+        const dto = {
+          text: 'Avalie a disciplina.',
+          type: QuestionType.SCALE,
+          scaleMin,
+          scaleMax,
+        };
+        dimensionRepositoryMock.findOne.mockResolvedValue(dimension);
+        questionRepositoryMock.create.mockImplementation((values) => values);
+        questionRepositoryMock.save.mockImplementation(async (values) => values);
+
+        await expect(
+          service.createQuestion(dimensionId, dto),
+        ).resolves.toMatchObject({ scaleMin, scaleMax });
+      },
+    );
 
     it('deve cadastrar uma pergunta do tipo SINGLE_CHOICE', async () => {
       const dto = {

@@ -5,6 +5,8 @@ import AcademicTerms from "./AcademicTerms";
 import AcademicClasses from "./AcademicClasses";
 import EvaluationPeriods from "./EvaluationPeriods";
 import EvaluationManagement from "./EvaluationManagement";
+import EvaluationAnalysis from "./EvaluationAnalysis";
+import ImprovementPlans from "./ImprovementPlans";
 import QuestionnaireManagement from "./QuestionnaireManagement";
 import EvaluationEligibilities from "./EvaluationEligibilities";
 import "./AdministrativePanel.css";
@@ -15,6 +17,8 @@ type Props = {
 
 type Section =
   | "evaluations"
+  | "analysis"
+  | "improvement-plans"
   | "courses"
   | "disciplines"
   | "terms"
@@ -25,6 +29,8 @@ type Section =
 
 const VALID_SECTIONS: Section[] = [
   "evaluations",
+  "analysis",
+  "improvement-plans",
   "courses",
   "disciplines",
   "terms",
@@ -48,6 +54,16 @@ const MENU_GROUPS: { title: string; items: MenuItem[] }[] = [
         section: "evaluations",
         title: "Avaliações",
         description: "Cadastrar e consultar avaliações",
+      },
+      {
+        section: "analysis",
+        title: "Análise de resultados",
+        description: "Consultar resultados e comparar períodos",
+      },
+      {
+        section: "improvement-plans",
+        title: "Planos de melhoria",
+        description: "Registrar ações e acompanhar prazos",
       },
       {
         section: "periods",
@@ -109,6 +125,17 @@ function MenuIcon({ section }: { section: Section }) {
         <>
           <rect x="5" y="3" width="14" height="18" rx="2" />
           <path d="M9 8h6M9 12h6M9 16h3" />
+        </>
+      )}
+
+      {section === "analysis" && (
+        <path d="M4 4v16h16M9 16v-4m5 4V8m5 8V5" />
+      )}
+
+      {section === "improvement-plans" && (
+        <>
+          <rect x="5" y="4" width="14" height="16" rx="2" />
+          <path d="m8 12 3 3 5-6" />
         </>
       )}
 
@@ -277,6 +304,10 @@ export default function AdministrativePanel({ role }: Props) {
 
       {activeSection === "evaluations" ? (
         <EvaluationManagement role={role} />
+      ) : activeSection === "analysis" ? (
+        <EvaluationAnalysis />
+      ) : activeSection === "improvement-plans" ? (
+        <ImprovementPlans role={role} />
       ) : activeSection === "courses" ? (
         <AcademicCourses role={role} />
       ) : activeSection === "disciplines" ? (

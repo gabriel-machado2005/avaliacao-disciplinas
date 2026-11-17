@@ -1,118 +1,18 @@
 import { useEffect, useState } from "react";
-
-type ResultQuestion = {
-  id: string;
-  text: string;
-  responses: number;
-} & (
-  | {
-      type: "SCALE";
-      average: number | null;
-      distribution: Record<string, number>;
-    }
-  | {
-      type: "SINGLE_CHOICE";
-      distribution: Record<string, number>;
-    }
-  | {
-      type: "TEXT";
-      comments: string[];
-    }
-);
-
-type EvaluationResult = {
-  evaluation: {
-    discipline: {
-      name: string;
-      code: string;
-    };
-    classGroup: string;
-    academicTerm: string;
-  };
-  participation: {
-    eligible: number;
-    responses: number;
-    rate: number;
-  };
-  dimensions: {
-    id: string;
-    name: string;
-    questions: ResultQuestion[];
-  }[];
-};
+import {
+  buildEvaluationResultsCsv,
+  questionStatusLabels,
+  type EvaluationResult,
+} from "./evaluation-results-csv";
 
 type Props = {
   evaluationId: string;
   onBack: () => void;
+  backLabel?: string;
 };
 
 function exportEvaluationResultsCsv(results: EvaluationResult) {
-  const headers = [
-    "Disciplina",
-    "Código",
-    "Turma",
-    "Semestre",
-    "Estudantes habilitados",
-    "Respostas recebidas",
-    "Taxa de participação (%)",
-    "Dimensão",
-    "Pergunta",
-    "Tipo",
-    "Respostas da pergunta",
-    "Média",
-    "Distribuição",
-  ];
-
-  const rows: (string | number)[][] = [];
-
-  for (const dimension of results.dimensions) {
-    for (const question of dimension.questions) {
-      const average =
-        question.type === "SCALE" && question.average !== null
-          ? question.average.toLocaleString("pt-BR")
-          : "";
-
-      const distribution =
-        question.type === "TEXT"
-          ? ""
-          : Object.entries(question.distribution)
-              .map(([option, count]) => `${option}: ${count}`)
-              .join(" | ");
-
-      rows.push([
-        results.evaluation.discipline.name,
-        results.evaluation.discipline.code,
-        results.evaluation.classGroup,
-        results.evaluation.academicTerm,
-        results.participation.eligible,
-        results.participation.responses,
-        results.participation.rate.toLocaleString("pt-BR"),
-        dimension.name,
-        question.text,
-        question.type,
-        question.responses,
-        average,
-        distribution,
-      ]);
-    }
-  }
-
-  function formatCell(value: string | number) {
-    let text = String(value);
-
-    // Evita que textos sejam interpretados como fórmulas no Excel.
-    if (/^\s*[=+\-@]/.test(text)) {
-      text = "'" + text;
-    }
-
-    return `"${text.replace(/"/g, '""')}"`;
-  }
-
-  const csv = [headers, ...rows]
-    .map((row) => row.map(formatCell).join(";"))
-    .join("\r\n");
-
-  const blob = new Blob(["\uFEFF", csv], {
+  const blob = new Blob([buildEvaluationResultsCsv(results)], {
     type: "text/csv;charset=utf-8;",
   });
 
@@ -136,7 +36,11 @@ function exportEvaluationResultsCsv(results: EvaluationResult) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export default function EvaluationResults({ evaluationId, onBack }: Props) {
+export default function EvaluationResults({
+  evaluationId,
+  onBack,
+  backLabel = "Voltar para avaliações",
+}: Props) {
   const [results, setResults] = useState<EvaluationResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -158,6 +62,7 @@ export default function EvaluationResults({ evaluationId, onBack }: Props) {
             headers: {
               Authorization: `Bearer ${token}`,
             },
+            cache: "no-store",
             signal: controller.signal,
           },
         );
@@ -202,7 +107,7 @@ export default function EvaluationResults({ evaluationId, onBack }: Props) {
         className="ui-btn ui-btn--secondary"
         onClick={onBack}
       >
-        Voltar para avaliações
+        {backLabel}
       </button>
 
       <h2>Resultados da avaliação</h2>
@@ -254,113 +159,118 @@ export default function EvaluationResults({ evaluationId, onBack }: Props) {
 
               {dimension.questions.map((question) => (
                 <div key={question.id} className="evaluation-card ui-card">
-                  <h4 className="ui-card__title">{question.text}</h4>
+                  <div className="ui-card__header">
+                    <h4 className="ui-card__title">{question.text}</h4>
+                    {question.status !== "AVAILABLE" && (
+                      <span
+                        className={`ui-status ui-status--${question.status === "NO_RESPONSES" ? "inactive" : "pending"}`}
+                      >
+                        {questionStatusLabels[question.status]}
+                      </span>
+                    )}
+                  </div>
 
-                  <p className="ui-card__meta">
-                    Respostas: {question.responses}
-                  </p>
-
-                  {question.type === "SCALE" && (
-                    <>
-                      <p>
-                        Média:{" "}
-                        {question.average === null
-                          ? "Sem respostas"
-                          : question.average.toLocaleString("pt-BR")}
-                      </p>
-
-                      <h5>Distribuição</h5>
-
-                      <div>
-                        {Object.entries(question.distribution).map(
-                          ([value, count]) => {
-                            const percentage =
-                              question.responses > 0
-                                ? (count / question.responses) * 100
-                                : 0;
-
-                            return (
-                              <div
-                                key={value}
-                                className="results-distribution__row"
-                              >
-                                <span className="results-distribution__label results-distribution__label--scale">
-                                  Nota {value}
-                                </span>
-
-                                <div className="results-distribution__track">
-                                  <div
-                                    className="results-distribution__fill"
-                                    style={{ width: `${percentage}%` }}
-                                  />
-                                </div>
-
-                                <span className="results-distribution__count">
-                                  {count} ({percentage.toFixed(0)}%)
-                                </span>
-                              </div>
-                            );
-                          },
-                        )}
-                      </div>
-                    </>
+                  {(question.status === "AVAILABLE" ||
+                    question.status === "COMMENTS_PROTECTED") && (
+                    <p className="ui-card__meta">
+                      Respostas: {question.responses}
+                    </p>
                   )}
 
-                  {question.type === "SINGLE_CHOICE" && (
-                    <>
-                      <h5>Distribuição</h5>
-
-                      <div>
-                        {Object.entries(question.distribution).map(
-                          ([option, count]) => {
-                            const percentage =
-                              question.responses > 0
-                                ? (count / question.responses) * 100
-                                : 0;
-
-                            return (
-                              <div
-                                key={option}
-                                className="results-distribution__row"
-                              >
-                                <span className="results-distribution__label">
-                                  {option}
-                                </span>
-
-                                <div className="results-distribution__track">
-                                  <div
-                                    className="results-distribution__fill"
-                                    style={{ width: `${percentage}%` }}
-                                  />
-                                </div>
-
-                                <span className="results-distribution__count">
-                                  {count} ({percentage.toFixed(0)}%)
-                                </span>
-                              </div>
-                            );
-                          },
-                        )}
-                      </div>
-                    </>
+                  {question.status === "PROTECTED" && (
+                    <p className="ui-feedback">
+                      Esta pergunta recebeu respostas abaixo do mínimo exigido
+                      para divulgar as métricas.
+                    </p>
                   )}
 
-                  {question.type === "TEXT" && (
-                    <>
-                      <h5>Comentários</h5>
+                  {question.status === "AVAILABLE" &&
+                    question.type === "SCALE" && (
+                      <>
+                        <p>Média: {question.average.toLocaleString("pt-BR")}</p>
 
-                      {question.comments.length === 0 ? (
-                        <p>Nenhum comentário registrado.</p>
-                      ) : (
-                        <div className="results-comments">
-                          {question.comments.map((comment, index) => (
-                            <div key={index} className="results-comment">
-                              {comment}
-                            </div>
-                          ))}
+                        <h5>Distribuição</h5>
+
+                        <div>
+                          {Object.entries(question.distribution).map(
+                            ([value, count]) => {
+                              const percentage =
+                                question.responses > 0
+                                  ? (count / question.responses) * 100
+                                  : 0;
+
+                              return (
+                                <div
+                                  key={value}
+                                  className="results-distribution__row"
+                                >
+                                  <span className="results-distribution__label results-distribution__label--scale">
+                                    Nota {value}
+                                  </span>
+
+                                  <div className="results-distribution__track">
+                                    <div
+                                      className="results-distribution__fill"
+                                      style={{ width: `${percentage}%` }}
+                                    />
+                                  </div>
+
+                                  <span className="results-distribution__count">
+                                    {count} ({percentage.toFixed(0)}%)
+                                  </span>
+                                </div>
+                              );
+                            },
+                          )}
                         </div>
-                      )}
-                    </>
+                      </>
+                    )}
+
+                  {question.status === "AVAILABLE" &&
+                    question.type === "SINGLE_CHOICE" && (
+                      <>
+                        <h5>Distribuição</h5>
+
+                        <div>
+                          {Object.entries(question.distribution).map(
+                            ([option, count]) => {
+                              const percentage =
+                                question.responses > 0
+                                  ? (count / question.responses) * 100
+                                  : 0;
+
+                              return (
+                                <div
+                                  key={option}
+                                  className="results-distribution__row"
+                                >
+                                  <span className="results-distribution__label">
+                                    {option}
+                                  </span>
+
+                                  <div className="results-distribution__track">
+                                    <div
+                                      className="results-distribution__fill"
+                                      style={{ width: `${percentage}%` }}
+                                    />
+                                  </div>
+
+                                  <span className="results-distribution__count">
+                                    {count} ({percentage.toFixed(0)}%)
+                                  </span>
+                                </div>
+                              );
+                            },
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                  {question.status === "COMMENTS_PROTECTED" && (
+                    <p className="ui-feedback">
+                      O texto dos comentários fica protegido para preservar o
+                      anonimato dos estudantes.
+                    </p>
                   )}
                 </div>
               ))}

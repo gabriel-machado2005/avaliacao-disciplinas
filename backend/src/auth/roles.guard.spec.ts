@@ -31,7 +31,11 @@ describe('RolesGuard - permissões acadêmicas', () => {
 
   function createEvaluationContext(
     method:
-      'deletePeriod' | 'findPeriods' | 'deleteEvaluation' | 'updateEvaluation',
+      | 'deletePeriod'
+      | 'findPeriods'
+      | 'deleteEvaluation'
+      | 'updateEvaluation'
+      | 'getAnalysis',
     role: UserRole,
   ): ExecutionContext {
     return {
@@ -181,5 +185,14 @@ describe('RolesGuard - permissões acadêmicas', () => {
     );
 
     expect(guard.canActivate(context)).toBe(false);
+  });
+
+  it.each([
+    [UserRole.ADMIN, true],
+    [UserRole.COORDINATOR, true],
+    [UserRole.PROFESSOR, false],
+    [UserRole.STUDENT, false],
+  ])('deve aplicar a permissão de consulta analítica para %s', (role, allowed) => {
+    expect(guard.canActivate(createEvaluationContext('getAnalysis', role))).toBe(allowed);
   });
 });

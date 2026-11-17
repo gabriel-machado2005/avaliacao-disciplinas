@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { auditedWrite, auditSave } from '../audit/administrative-audit';
 import { Evaluation } from '../evaluations/entities/evaluation.entity';
 import { CreateDimensionDto } from './dto/create-dimension.dto';
 import { CreateQuestionDto } from './dto/create-question.dto';
@@ -13,6 +14,7 @@ import { CreateQuestionnaireDto } from './dto/create-questionnaire.dto';
 import { UpdateQuestionnaireDto } from './dto/update-questionnaire.dto';
 import { Dimension } from './entities/dimension.entity';
 import { Question, QuestionType } from './entities/question.entity';
+import { MAX_SCALE_SPAN, MAX_SCALE_VALUE, MIN_SCALE_VALUE } from './question-scale';
 import { Questionnaire } from './entities/questionnaire.entity';
 
 @Injectable()
@@ -37,7 +39,12 @@ export class QuestionnairesService {
       description: dto.description ?? null,
     });
 
-    return this.questionnaireRepository.save(questionnaire);
+    return auditSave(
+      this.questionnaireRepository,
+      questionnaire,
+      'CREATE',
+      'QUESTIONNAIRE',
+    );
   }
 
   findQuestionnaires() {
@@ -85,7 +92,12 @@ export class QuestionnairesService {
       questionnaire.description = dto.description?.trim() || null;
     }
 
-    return this.questionnaireRepository.save(questionnaire);
+    return auditSave(
+      this.questionnaireRepository,
+      questionnaire,
+      'UPDATE',
+      'QUESTIONNAIRE',
+    );
   }
 
   async findQuestionnaire(id: string) {
@@ -132,7 +144,13 @@ export class QuestionnairesService {
       );
     }
 
-    await this.questionnaireRepository.remove(questionnaire);
+    await auditedWrite(
+      this.questionnaireRepository,
+      'DELETE',
+      'QUESTIONNAIRE',
+      (repo) => repo.remove(questionnaire),
+      () => id,
+    );
 
     return {
       message: 'Questionário excluído com sucesso.',
@@ -155,7 +173,7 @@ export class QuestionnairesService {
       questionnaire,
     });
 
-    return this.dimensionRepository.save(dimension);
+    return auditSave(this.dimensionRepository, dimension, 'CREATE', 'DIMENSION');
   }
 
   async createQuestion(dimensionId: string, dto: CreateQuestionDto) {
@@ -172,18 +190,38 @@ export class QuestionnairesService {
     let options: string[] | null = null;
 
     if (dto.type === QuestionType.SCALE) {
-      if (dto.scaleMin === undefined || dto.scaleMax === undefined) {
+      const { scaleMin: min, scaleMax: max } = dto;
+      if (typeof min !== 'number' || typeof max !== 'number') {
         throw new BadRequestException(
           'Questões do tipo SCALE precisam de scaleMin e scaleMax.',
         );
       }
 
-      if (dto.scaleMax <= dto.scaleMin) {
+      if (
+        !Number.isInteger(min) ||
+        !Number.isInteger(max) ||
+        min < MIN_SCALE_VALUE ||
+        min > MAX_SCALE_VALUE ||
+        max < MIN_SCALE_VALUE ||
+        max > MAX_SCALE_VALUE
+      ) {
+        throw new BadRequestException(
+          `Os limites da escala devem ser inteiros de ${MIN_SCALE_VALUE} a ${MAX_SCALE_VALUE}.`,
+        );
+      }
+
+      if (max <= min) {
         throw new BadRequestException('scaleMax deve ser maior que scaleMin.');
       }
 
-      scaleMin = dto.scaleMin;
-      scaleMax = dto.scaleMax;
+      if (max - min > MAX_SCALE_SPAN) {
+        throw new BadRequestException(
+          `A diferença entre o máximo e o mínimo da escala deve ser de até ${MAX_SCALE_SPAN} pontos.`,
+        );
+      }
+
+      scaleMin = min;
+      scaleMax = max;
     }
 
     if (dto.type === QuestionType.SINGLE_CHOICE) {
@@ -207,6 +245,6 @@ export class QuestionnairesService {
       dimension,
     });
 
-    return this.questionRepository.save(question);
+    return auditSave(this.questionRepository, question, 'CREATE', 'QUESTION');
   }
 }

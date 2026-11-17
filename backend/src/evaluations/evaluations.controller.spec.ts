@@ -6,6 +6,13 @@ import { EvaluationsService } from './evaluations.service';
 import { UserRole } from '../users/entities/user.entity';
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '../auth/roles.decorator';
+import {
+  BadRequestException,
+  ParseUUIDPipe,
+  ValidationPipe,
+} from '@nestjs/common';
+import { ROUTE_ARGS_METADATA } from '@nestjs/common/constants';
+import { EvaluationAnalysisQueryDto } from './dto/evaluation-analysis-query.dto';
 
 describe('EvaluationsController', () => {
   let controller: EvaluationsController;
@@ -27,6 +34,7 @@ describe('EvaluationsController', () => {
     findQuestionnaireForStudent: jest.fn(),
     submitEvaluation: jest.fn(),
     getResults: jest.fn(),
+    getAnalysis: jest.fn(),
     updateEvaluationSettings: jest.fn(),
   };
 
@@ -57,6 +65,71 @@ describe('EvaluationsController', () => {
 
   it('deve criar o controller de avaliações corretamente', () => {
     expect(controller).toBeDefined();
+  });
+
+  it.each([
+    'findEligibilities',
+    'getQuestionnaireForStudent',
+    'submitEvaluation',
+    'getResults',
+    'updateEvaluationSettings',
+  ])(
+    'valida evaluationId com HTTP 400 para UUID malformado em %s',
+    async (handler) => {
+      const params = Reflect.getMetadata(
+        ROUTE_ARGS_METADATA,
+        EvaluationsController,
+        handler,
+      ) as Record<string, { data: string; pipes: unknown[] }>;
+      const evaluationId = Object.values(params).find(
+        ({ data }) => data === 'evaluationId',
+      );
+      expect(evaluationId?.pipes).toContain(ParseUUIDPipe);
+
+      const pipe = new ParseUUIDPipe();
+      const metadata = { type: 'param', data: 'evaluationId' } as const;
+      await expect(pipe.transform('não-é-uuid', metadata)).rejects.toMatchObject({
+        status: 400,
+      });
+      const validId = '098ea1be-a0d9-47f4-9edc-4877c10ad03a';
+      await expect(pipe.transform(validId, metadata)).resolves.toBe(validId);
+    },
+  );
+
+  describe('Consulta analítica', () => {
+    const periodId = '66aaef6a-4dac-4325-9e37-81cdb5939c8b';
+    const pipe = new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    });
+    const validate = (query: Record<string, unknown>) =>
+      pipe.transform(query, { type: 'query', metatype: EvaluationAnalysisQueryDto });
+
+    it('deve validar os UUIDs e encaminhar a consulta com o usuário autenticado', async () => {
+      const query = await validate({ periodId });
+      const user = { userId: 'coordinator-1', role: UserRole.COORDINATOR };
+      const report = { periods: [], questions: [] };
+      evaluationsServiceMock.getAnalysis.mockResolvedValue(report);
+
+      await expect(controller.getAnalysis(query, { user })).resolves.toBe(report);
+      expect(query).toBeInstanceOf(EvaluationAnalysisQueryDto);
+      expect(evaluationsServiceMock.getAnalysis).toHaveBeenCalledWith(query, user);
+    });
+
+    it.each([
+      {},
+      { periodId: 'inválido' },
+      { periodId, comparisonPeriodId: '' },
+      { periodId, courseId: [periodId, periodId] },
+      { periodId, disciplineId: 'inválido' },
+      { periodId, professorId: 'inválido' },
+      { periodId, dimensionId: 'inválido' },
+      { periodId, studentId: periodId },
+    ])('deve rejeitar uma consulta inválida (%j)', async (query) => {
+      await expect(validate(query)).rejects.toThrow(BadRequestException);
+      expect(evaluationsServiceMock.getAnalysis).not.toHaveBeenCalled();
+    });
   });
 
   describe('Gerenciamento administrativo', () => {

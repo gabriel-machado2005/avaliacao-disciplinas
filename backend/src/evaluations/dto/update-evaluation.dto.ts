@@ -1,3 +1,4 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsInt, IsOptional, IsUUID, Min } from 'class-validator';
 
 export class UpdateEvaluationDto {
@@ -13,6 +14,7 @@ export class UpdateEvaluationDto {
   @IsUUID()
   questionnaireId?: string;
 
+  @ApiPropertyOptional({ type: 'integer' })
   @IsOptional()
   @IsInt()
   @Min(2)

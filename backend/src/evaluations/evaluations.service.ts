@@ -7,7 +7,9 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, QueryFailedError, Repository } from 'typeorm';
+import { auditDelete, auditSave, recordAudit } from '../audit/administrative-audit';
 import { ClassGroup } from '../academic/entities/class-group.entity';
+import { ImprovementPlan } from '../improvement-plans/entities/improvement-plan.entity';
 import { Questionnaire } from '../questionnaires/entities/questionnaire.entity';
 import { CreateEvaluationDto } from './dto/create-evaluation.dto';
 import { CreateEvaluationPeriodDto } from './dto/create-evaluation-period.dto';
@@ -17,12 +19,24 @@ import { User, UserRole } from '../users/entities/user.entity';
 import { CreateEvaluationEligibilityDto } from './dto/create-evaluation-eligibility.dto';
 import { EvaluationEligibility } from './entities/evaluation-eligibility.entity';
 import { QuestionType } from '../questionnaires/entities/question.entity';
+import { MAX_SCALE_SPAN } from '../questionnaires/question-scale';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { Answer } from './entities/answer.entity';
 import { Submission } from './entities/submission.entity';
 import { UpdateEvaluationSettingsDto } from './dto/update-evaluation-settings.dto';
 import { UpdateEvaluationPeriodDto } from './dto/update-evaluation-period.dto';
 import { UpdateEvaluationDto } from './dto/update-evaluation.dto';
+import { EvaluationAnalysisQueryDto } from './dto/evaluation-analysis-query.dto';
+import {
+  getResultReleaseError,
+  queryEvaluationAnalysis,
+} from './evaluation-analysis';
+
+function getProtectedQuestionStatus(responses: number, minimum: number | null) {
+  if (responses === 0) return 'NO_RESPONSES';
+  if (minimum === null || responses < minimum) return 'PROTECTED';
+  return null;
+}
 
 @Injectable()
 export class EvaluationsService {
@@ -63,7 +77,12 @@ export class EvaluationsService {
       endDate,
     });
 
-    return this.evaluationPeriodRepository.save(period);
+    return auditSave(
+      this.evaluationPeriodRepository,
+      period,
+      'CREATE',
+      'EVALUATION_PERIOD',
+    );
   }
 
   async updatePeriod(id: string, dto: UpdateEvaluationPeriodDto) {
@@ -133,7 +152,12 @@ export class EvaluationsService {
     period.startDate = startDate;
     period.endDate = endDate;
 
-    return this.evaluationPeriodRepository.save(period);
+    return auditSave(
+      this.evaluationPeriodRepository,
+      period,
+      'UPDATE',
+      'EVALUATION_PERIOD',
+    );
   }
 
   async deletePeriod(id: string) {
@@ -158,7 +182,11 @@ export class EvaluationsService {
     }
 
     try {
-      const result = await this.evaluationPeriodRepository.delete(id);
+      const result = await auditDelete(
+        this.evaluationPeriodRepository,
+        'EVALUATION_PERIOD',
+        id,
+      );
 
       if (!result.affected) {
         throw new NotFoundException('Período de avaliação não encontrado.');
@@ -246,7 +274,7 @@ export class EvaluationsService {
       minResponsesForResults: dto.minResponsesForResults,
     });
 
-    return this.evaluationRepository.save(evaluation);
+    return auditSave(this.evaluationRepository, evaluation, 'CREATE', 'EVALUATION');
   }
 
   findEvaluations() {
@@ -318,6 +346,7 @@ export class EvaluationsService {
           throw new NotFoundException('Avaliação não encontrada.');
         }
 
+        await recordAudit(manager, 'DELETE', 'EVALUATION', id);
         return {
           message: 'Avaliação excluída com sucesso.',
         };
@@ -458,6 +487,22 @@ export class EvaluationsService {
             throw new NotFoundException('Turma não encontrada.');
           }
 
+          const linkedPlan = await manager.findOne(ImprovementPlan, {
+            where: { originEvaluationId: id },
+            select: { disciplineId: true },
+          });
+          if (
+            linkedPlan &&
+            !(await manager.existsBy(ClassGroup, {
+              id: classGroup.id,
+              discipline: { id: linkedPlan.disciplineId },
+            }))
+          ) {
+            throw new ConflictException(
+              'Esta avaliação é a origem de um plano de melhoria e deve permanecer na mesma disciplina.',
+            );
+          }
+
           evaluation.classGroup = classGroup;
         }
 
@@ -500,11 +545,22 @@ export class EvaluationsService {
           }
         }
 
+        const minimumChanged =
+          dto.minResponsesForResults !== undefined &&
+          dto.minResponsesForResults !== evaluation.minResponsesForResults;
+
         if (dto.minResponsesForResults !== undefined) {
           evaluation.minResponsesForResults = dto.minResponsesForResults;
         }
 
-        return evaluationRepo.save(evaluation);
+        const saved = await evaluationRepo.save(evaluation);
+        if (relationshipsChanged || !minimumChanged) {
+          await recordAudit(manager, 'UPDATE', 'EVALUATION', id);
+        }
+        if (minimumChanged) {
+          await recordAudit(manager, 'UPDATE_MIN_RESPONSES', 'EVALUATION', id);
+        }
+        return saved;
       });
     } catch (error) {
       if (error instanceof QueryFailedError) {
@@ -607,7 +663,14 @@ export class EvaluationsService {
       completed: false,
     });
 
-    return this.evaluationEligibilityRepository.save(eligibility);
+    // Store the evaluation, not the eligibility or the student identifier.
+    return auditSave(
+      this.evaluationEligibilityRepository,
+      eligibility,
+      'GRANT_ELIGIBILITY',
+      'EVALUATION',
+      evaluation.id,
+    );
   }
 
   async findEligibilities(evaluationId: string) {
@@ -654,8 +717,11 @@ export class EvaluationsService {
 
       const eligibility = await eligibilityRepository.findOne({
         where: { id: eligibilityId },
+        relations: { evaluation: true },
+        select: { id: true, completed: true, evaluation: { id: true } },
         lock: {
           mode: 'pessimistic_write',
+          tables: ['evaluation_eligibilities'],
         },
       });
 
@@ -670,6 +736,12 @@ export class EvaluationsService {
       }
 
       await eligibilityRepository.delete(eligibility.id);
+      await recordAudit(
+        manager,
+        'REVOKE_ELIGIBILITY',
+        'EVALUATION',
+        eligibility.evaluation.id,
+      );
 
       return {
         message: 'Habilitação do estudante removida com sucesso.',
@@ -1013,6 +1085,20 @@ export class EvaluationsService {
       };
     });
   }
+  getAnalysis(query: EvaluationAnalysisQueryDto, requester: { role: UserRole }) {
+    if (
+      requester.role !== UserRole.ADMIN && requester.role !== UserRole.COORDINATOR
+    ) {
+      throw new ForbiddenException(
+        'Você não possui acesso à análise de resultados.',
+      );
+    }
+
+    return this.dataSource.transaction('REPEATABLE READ', (manager) =>
+      queryEvaluationAnalysis(manager, query),
+    );
+  }
+
   async getResults(
     evaluationId: string,
     requester: {
@@ -1069,26 +1155,10 @@ export class EvaluationsService {
       throw new ForbiddenException('Você não possui acesso aos resultados.');
     }
 
-    /*
-     * Resultados somente depois do encerramento.
-     */
     const now = new Date();
-    const endDate = new Date(evaluation.evaluationPeriod.endDate);
-
-    if (now <= endDate) {
-      throw new BadRequestException(
-        'Os resultados estarão disponíveis somente após o encerramento do período de avaliação.',
-      );
-    }
-
-    /*
-     * Avaliações antigas podem ainda estar
-     * sem essa configuração.
-     */
-    if (evaluation.minResponsesForResults === null) {
-      throw new BadRequestException(
-        'A quantidade mínima de respostas para divulgação dos resultados ainda não foi configurada.',
-      );
+    const releaseError = getResultReleaseError(evaluation, now);
+    if (releaseError) {
+      throw new BadRequestException(releaseError);
     }
 
     const eligibilityRepository = this.dataSource.getRepository(
@@ -1115,14 +1185,14 @@ export class EvaluationsService {
       },
     });
 
-    /*
-     * Não disponibiliza resultados enquanto
-     * o mínimo de respostas não for atingido.
-     */
-    if (responseCount < evaluation.minResponsesForResults) {
-      throw new BadRequestException(
-        `Os resultados ainda não podem ser divulgados. São necessárias pelo menos ${evaluation.minResponsesForResults} respostas.`,
-      );
+    const minimum = evaluation.minResponsesForResults;
+    const responseReleaseError = getResultReleaseError(
+      evaluation,
+      now,
+      responseCount,
+    );
+    if (responseReleaseError) {
+      throw new BadRequestException(responseReleaseError);
     }
 
     const answers = await answerRepository.find({
@@ -1149,26 +1219,33 @@ export class EvaluationsService {
         const questions = dimension.questions
           .sort((a, b) => a.order - b.order)
           .map((question) => {
+            const { id, text, type } = question;
+            const identity = { id, text };
             const questionAnswers = answers.filter(
-              (answer) => answer.question.id === question.id,
+              (answer) => answer.question.id === id,
             );
 
-            if (question.type === QuestionType.SCALE) {
-              const distribution: Record<string, number> = {};
-
-              if (question.scaleMin !== null && question.scaleMax !== null) {
-                for (
-                  let value = question.scaleMin;
-                  value <= question.scaleMax;
-                  value++
-                ) {
-                  distribution[String(value)] = 0;
-                }
-              }
-
+            if (type === QuestionType.SCALE) {
               const values = questionAnswers
                 .map((answer) => answer.scaleValue)
                 .filter((value): value is number => value !== null);
+              const status = getProtectedQuestionStatus(values.length, minimum);
+              if (status) return { ...identity, type, status };
+
+              const distribution: Record<string, number> = {};
+
+              const { scaleMin, scaleMax } = question;
+              if (
+                scaleMin !== null &&
+                scaleMax !== null &&
+                Number.isSafeInteger(scaleMin) &&
+                Number.isSafeInteger(scaleMax) &&
+                scaleMax - scaleMin <= MAX_SCALE_SPAN
+              ) {
+                for (let value = scaleMin; value <= scaleMax; value++) {
+                  distribution[String(value)] = 0;
+                }
+              }
 
               for (const value of values) {
                 const key = String(value);
@@ -1176,63 +1253,59 @@ export class EvaluationsService {
                 distribution[key] = (distribution[key] ?? 0) + 1;
               }
 
-              const average =
-                values.length > 0
-                  ? Number(
-                      (
-                        values.reduce((sum, value) => sum + value, 0) /
-                        values.length
-                      ).toFixed(2),
-                    )
-                  : null;
+              const average = Number(
+                (
+                  values.reduce((sum, value) => sum + value, 0) / values.length
+                ).toFixed(2),
+              );
 
               return {
-                id: question.id,
-                text: question.text,
-                type: question.type,
+                ...identity,
+                type,
+                status: 'AVAILABLE' as const,
                 responses: values.length,
                 average,
                 distribution,
               };
             }
 
-            if (question.type === QuestionType.SINGLE_CHOICE) {
+            if (type === QuestionType.SINGLE_CHOICE) {
+              const values = questionAnswers
+                .map((answer) => answer.choiceValue)
+                .filter((value): value is string => value !== null);
+              const status = getProtectedQuestionStatus(values.length, minimum);
+              if (status) return { ...identity, type, status };
+
               const distribution: Record<string, number> = {};
 
               for (const option of question.options ?? []) {
                 distribution[option] = 0;
               }
 
-              const values = questionAnswers
-                .map((answer) => answer.choiceValue)
-                .filter((value): value is string => value !== null);
-
               for (const value of values) {
                 distribution[value] = (distribution[value] ?? 0) + 1;
               }
 
               return {
-                id: question.id,
-                text: question.text,
-                type: question.type,
+                ...identity,
+                type,
+                status: 'AVAILABLE' as const,
                 responses: values.length,
                 distribution,
               };
             }
 
-            const comments = questionAnswers
-              .map((answer) => answer.textValue)
-              .filter(
-                (value): value is string =>
-                  value !== null && value.trim().length > 0,
-              );
+            const responses = questionAnswers.filter(({ textValue }) =>
+              Boolean(textValue?.trim()),
+            ).length;
+            const status = getProtectedQuestionStatus(responses, minimum);
+            if (status) return { ...identity, type, status };
 
             return {
-              id: question.id,
-              text: question.text,
-              type: question.type,
-              responses: comments.length,
-              comments,
+              ...identity,
+              type,
+              status: 'COMMENTS_PROTECTED' as const,
+              responses,
             };
           });
 
@@ -1264,7 +1337,7 @@ export class EvaluationsService {
         rate: participationRate,
       },
 
-      minResponsesForResults: evaluation.minResponsesForResults,
+      minResponsesForResults: minimum,
 
       dimensions,
     };
@@ -1285,6 +1358,11 @@ export class EvaluationsService {
 
     evaluation.minResponsesForResults = dto.minResponsesForResults;
 
-    return this.evaluationRepository.save(evaluation);
+    return auditSave(
+      this.evaluationRepository,
+      evaluation,
+      'UPDATE_MIN_RESPONSES',
+      'EVALUATION',
+    );
   }
 }
