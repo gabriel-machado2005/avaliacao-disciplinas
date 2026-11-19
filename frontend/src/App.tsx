@@ -307,7 +307,11 @@ function App() {
 
           <AdministrativePanel role={loggedInUser.role} />
 
-          <button type="button" onClick={handleLogout}>
+          <button
+            type="button"
+            onClick={handleLogout}
+            style={{ marginTop: "20px" }}
+          >
             Sair
           </button>
         </section>
