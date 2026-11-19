@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import EvaluationResults from "./EvaluationResults";
+import { getEvaluationPeriodStatus } from "./evaluation-period-status";
 
 type ProfessorEvaluation = {
   id: string;
   evaluationPeriod: {
     name: string;
+    active: boolean;
+    startDate: string;
     endDate: string;
   };
   classGroup: {
@@ -28,6 +31,7 @@ export default function ProfessorEvaluations({
   refreshKey = 0,
 }: Props) {
   const [evaluations, setEvaluations] = useState<ProfessorEvaluation[]>([]);
+  const [loadedAt, setLoadedAt] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedEvaluationId, setSelectedEvaluationId] = useState<
@@ -65,6 +69,7 @@ export default function ProfessorEvaluations({
 
         if (!controller.signal.aborted) {
           setEvaluations(data);
+          setLoadedAt(Date.now());
         }
       } catch (err) {
         if (!controller.signal.aborted) {
@@ -111,33 +116,44 @@ export default function ProfessorEvaluations({
 
   return (
     <ul className="evaluation-list">
-      {evaluations.map((evaluation) => (
-        <li key={evaluation.id} className="evaluation-card ui-card">
-          <h4 className="ui-card__title">
-            {evaluation.classGroup.discipline.name}
-          </h4>
+      {evaluations.map((evaluation) => {
+        const status = getEvaluationPeriodStatus(
+          evaluation.evaluationPeriod,
+          loadedAt,
+        );
 
-          <p className="ui-card__meta">Turma: {evaluation.classGroup.code}</p>
+        return (
+          <li key={evaluation.id} className="evaluation-card ui-card">
+            <h4 className="ui-card__title">
+              {evaluation.classGroup.discipline.name}
+            </h4>
 
-          <p className="ui-card__meta">
-            Semestre: {evaluation.classGroup.academicTerm.code}
-          </p>
+            <p className="ui-card__meta">Turma: {evaluation.classGroup.code}</p>
 
-          <p className="ui-card__meta">
-            Período: {evaluation.evaluationPeriod.name}
-          </p>
+            <p className="ui-card__meta">
+              Semestre: {evaluation.classGroup.academicTerm.code}
+            </p>
 
-          <div className="ui-card__actions">
-            <button
-              type="button"
-              className="ui-btn ui-btn--secondary"
-              onClick={() => setSelectedEvaluationId(evaluation.id)}
-            >
-              Ver resultados
-            </button>
-          </div>
-        </li>
-      ))}
+            <p className="ui-card__meta">
+              Período: {evaluation.evaluationPeriod.name}
+            </p>
+
+            <span className={`ui-status ui-status--${status.style}`}>
+              Situação: {status.label}
+            </span>
+
+            <div className="ui-card__actions">
+              <button
+                type="button"
+                className="ui-btn ui-btn--secondary"
+                onClick={() => setSelectedEvaluationId(evaluation.id)}
+              >
+                Ver resultados
+              </button>
+            </div>
+          </li>
+        );
+      })}
     </ul>
   );
 }
