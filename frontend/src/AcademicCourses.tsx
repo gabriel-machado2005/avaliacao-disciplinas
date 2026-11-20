@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "./api-config";
 import { useEffect, useState, type FormEvent } from "react";
 
 type Course = {
@@ -35,7 +36,7 @@ export default function AcademicCourses({ role }: AcademicCoursesProps) {
           throw new Error("Faça login novamente para continuar.");
         }
 
-        const response = await fetch("http://localhost:3000/academic/courses", {
+        const response = await fetch(`${API_BASE_URL}/academic/courses`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -112,7 +113,7 @@ export default function AcademicCourses({ role }: AcademicCoursesProps) {
       }
 
       const response = await fetch(
-        `http://localhost:3000/academic/courses/${course.id}`,
+        `${API_BASE_URL}/academic/courses/${course.id}`,
         {
           method: "DELETE",
           headers: {
@@ -172,8 +173,8 @@ export default function AcademicCourses({ role }: AcademicCoursesProps) {
       const isEditing = courseIdToEdit !== null;
 
       const url = isEditing
-        ? `http://localhost:3000/academic/courses/${courseIdToEdit}`
-        : "http://localhost:3000/academic/courses";
+        ? `${API_BASE_URL}/academic/courses/${courseIdToEdit}`
+        : `${API_BASE_URL}/academic/courses`;
 
       const response = await fetch(url, {
         method: isEditing ? "PATCH" : "POST",

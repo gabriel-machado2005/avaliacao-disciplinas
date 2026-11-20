@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "./api-config";
 import { useEffect, useState } from "react";
 import EvaluationQuestionMetrics, {
   MetricBar,
@@ -73,7 +74,7 @@ async function fetchData<Data>(
     throw new Error("Faça login novamente para continuar.");
   }
 
-  const response = await fetch(`http://localhost:3000${path}`, {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: { Authorization: `Bearer ${token}` },
     signal,
   });

@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "./api-config";
 import { useEffect, useState, type FormEvent } from "react";
 
 type AcademicTerm = {
@@ -48,7 +49,7 @@ export default function AcademicTerms({ role }: AcademicTermsProps) {
           throw new Error("Faça login novamente para continuar.");
         }
 
-        const response = await fetch("http://localhost:3000/academic/terms", {
+        const response = await fetch(`${API_BASE_URL}/academic/terms`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -135,7 +136,7 @@ export default function AcademicTerms({ role }: AcademicTermsProps) {
       }
 
       const response = await fetch(
-        `http://localhost:3000/academic/terms/${term.id}`,
+        `${API_BASE_URL}/academic/terms/${term.id}`,
         {
           method: "DELETE",
           headers: {
@@ -197,8 +198,8 @@ export default function AcademicTerms({ role }: AcademicTermsProps) {
       }
 
       const url = isEditing
-        ? `http://localhost:3000/academic/terms/${editingTermId}`
-        : "http://localhost:3000/academic/terms";
+        ? `${API_BASE_URL}/academic/terms/${editingTermId}`
+        : `${API_BASE_URL}/academic/terms`;
 
       const response = await fetch(url, {
         method: isEditing ? "PATCH" : "POST",

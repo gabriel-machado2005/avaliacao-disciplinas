@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "./api-config";
 import { useEffect, useState, type FormEvent } from "react";
 
 type Course = {
@@ -57,11 +58,11 @@ export default function AcademicDisciplines({
         };
 
         const [coursesResponse, disciplinesResponse] = await Promise.all([
-          fetch("http://localhost:3000/academic/courses", {
+          fetch(`${API_BASE_URL}/academic/courses`, {
             headers,
             signal: controller.signal,
           }),
-          fetch("http://localhost:3000/academic/disciplines", {
+          fetch(`${API_BASE_URL}/academic/disciplines`, {
             headers,
             signal: controller.signal,
           }),
@@ -150,7 +151,7 @@ export default function AcademicDisciplines({
       }
 
       const response = await fetch(
-        `http://localhost:3000/academic/disciplines/${discipline.id}`,
+        `${API_BASE_URL}/academic/disciplines/${discipline.id}`,
         {
           method: "DELETE",
           headers: {
@@ -212,8 +213,8 @@ export default function AcademicDisciplines({
       }
 
       const url = isEditing
-        ? `http://localhost:3000/academic/disciplines/${disciplineIdToEdit}`
-        : "http://localhost:3000/academic/disciplines";
+        ? `${API_BASE_URL}/academic/disciplines/${disciplineIdToEdit}`
+        : `${API_BASE_URL}/academic/disciplines`;
 
       const response = await fetch(url, {
         method: isEditing ? "PATCH" : "POST",

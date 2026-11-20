@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "./api-config";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import QuestionnaireQuestions from "./QuestionnaireQuestions";
 
@@ -63,7 +64,7 @@ export default function QuestionnaireDimensions({
       }
 
       const response = await fetch(
-        `http://localhost:3000/questionnaires/${questionnaireId}`,
+        `${API_BASE_URL}/questionnaires/${questionnaireId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -163,7 +164,7 @@ export default function QuestionnaireDimensions({
       }
 
       const response = await fetch(
-        `http://localhost:3000/questionnaires/${questionnaireId}/dimensions`,
+        `${API_BASE_URL}/questionnaires/${questionnaireId}/dimensions`,
         {
           method: "POST",
           headers: {

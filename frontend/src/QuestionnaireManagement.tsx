@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "./api-config";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import QuestionnaireDimensions from "./QuestionnaireDimensions";
 
@@ -40,7 +41,7 @@ export default function QuestionnaireManagement() {
           throw new Error("Faça login novamente para continuar.");
         }
 
-        const response = await fetch("http://localhost:3000/questionnaires", {
+        const response = await fetch(`${API_BASE_URL}/questionnaires`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -124,8 +125,8 @@ export default function QuestionnaireManagement() {
       }
 
       const url = isEditing
-        ? `http://localhost:3000/questionnaires/${editingQuestionnaireId}`
-        : "http://localhost:3000/questionnaires";
+        ? `${API_BASE_URL}/questionnaires/${editingQuestionnaireId}`
+        : `${API_BASE_URL}/questionnaires`;
 
       const response = await fetch(url, {
         method: isEditing ? "PATCH" : "POST",
@@ -221,7 +222,7 @@ export default function QuestionnaireManagement() {
       }
 
       const response = await fetch(
-        `http://localhost:3000/questionnaires/${questionnaire.id}`,
+        `${API_BASE_URL}/questionnaires/${questionnaire.id}`,
         {
           method: "DELETE",
           headers: {

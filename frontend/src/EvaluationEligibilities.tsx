@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "./api-config";
 import { useEffect, useState, type FormEvent } from "react";
 
 type Student = {
@@ -60,11 +61,11 @@ export default function EvaluationEligibilities() {
         };
 
         const [evaluationsResponse, studentsResponse] = await Promise.all([
-          fetch("http://localhost:3000/evaluations", {
+          fetch(`${API_BASE_URL}/evaluations`, {
             headers,
             signal: controller.signal,
           }),
-          fetch("http://localhost:3000/users/students", {
+          fetch(`${API_BASE_URL}/users/students`, {
             headers,
             signal: controller.signal,
           }),
@@ -117,7 +118,7 @@ export default function EvaluationEligibilities() {
         }
 
         const response = await fetch(
-          `http://localhost:3000/evaluations/${evaluationId}/eligibilities`,
+          `${API_BASE_URL}/evaluations/${evaluationId}/eligibilities`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -189,7 +190,7 @@ export default function EvaluationEligibilities() {
       }
 
       const response = await fetch(
-        "http://localhost:3000/evaluations/eligibilities",
+        `${API_BASE_URL}/evaluations/eligibilities`,
         {
           method: "POST",
           headers: {
@@ -263,7 +264,7 @@ export default function EvaluationEligibilities() {
       }
 
       const response = await fetch(
-        `http://localhost:3000/evaluations/eligibilities/${eligibility.id}`,
+        `${API_BASE_URL}/evaluations/eligibilities/${eligibility.id}`,
         {
           method: "DELETE",
           headers: {

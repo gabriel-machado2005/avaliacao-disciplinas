@@ -16,3 +16,23 @@ frontend/.env
 Thumbs.db
 # TypeScript build cache
 *.tsbuildinfo
+
+# Ambientes locais (preserve os exemplos públicos)
+.env
+.env.*
+!.env.example
+
+# Certificados e chaves locais
+certs/
+certificates/
+*.pem
+*.key
+*.pfx
+*.p12
+*.crt
+*.cer
+
+# Arquivos temporários de consulta
+EvaluationResults.txt
+EvaluationsService.txt
+QuestionnaireManagement.txt

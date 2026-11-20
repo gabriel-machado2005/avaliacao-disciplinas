@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "./api-config";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import EvaluationResults from "./EvaluationResults";
 
@@ -95,15 +96,15 @@ export default function EvaluationManagement({
 
         const [periodsResponse, classesResponse, questionnairesResponse] =
           await Promise.all([
-            fetch("http://localhost:3000/evaluations/periods", {
+            fetch(`${API_BASE_URL}/evaluations/periods`, {
               headers,
               signal: controller.signal,
             }),
-            fetch("http://localhost:3000/academic/classes", {
+            fetch(`${API_BASE_URL}/academic/classes`, {
               headers,
               signal: controller.signal,
             }),
-            fetch("http://localhost:3000/questionnaires", {
+            fetch(`${API_BASE_URL}/questionnaires`, {
               headers,
               signal: controller.signal,
             }),
@@ -161,7 +162,7 @@ export default function EvaluationManagement({
           throw new Error("Faça login novamente para continuar.");
         }
 
-        const response = await fetch("http://localhost:3000/evaluations", {
+        const response = await fetch(`${API_BASE_URL}/evaluations`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -258,7 +259,7 @@ export default function EvaluationManagement({
       }
 
       const response = await fetch(
-        `http://localhost:3000/evaluations/${evaluation.id}`,
+        `${API_BASE_URL}/evaluations/${evaluation.id}`,
         {
           method: "DELETE",
           headers: {
@@ -323,8 +324,8 @@ export default function EvaluationManagement({
       const isEditing = editingEvaluationId !== null;
 
       const url = isEditing
-        ? `http://localhost:3000/evaluations/${editingEvaluationId}`
-        : "http://localhost:3000/evaluations";
+        ? `${API_BASE_URL}/evaluations/${editingEvaluationId}`
+        : `${API_BASE_URL}/evaluations`;
 
       const response = await fetch(url, {
         method: isEditing ? "PATCH" : "POST",

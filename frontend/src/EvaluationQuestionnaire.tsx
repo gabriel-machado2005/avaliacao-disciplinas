@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "./api-config";
 import { useState } from "react";
 import type { FormEvent } from "react";
 
@@ -92,7 +93,7 @@ export default function EvaluationQuestionnaire({ data, onBack }: Props) {
       }
 
       const response = await fetch(
-        `http://localhost:3000/evaluations/${data.evaluationId}/submissions`,
+        `${API_BASE_URL}/evaluations/${data.evaluationId}/submissions`,
         {
           method: "POST",
           headers: {

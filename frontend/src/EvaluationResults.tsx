@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "./api-config";
 import { useEffect, useState } from "react";
 import {
   buildEvaluationResultsCsv,
@@ -57,7 +58,7 @@ export default function EvaluationResults({
         }
 
         const response = await fetch(
-          `http://localhost:3000/evaluations/${evaluationId}/results`,
+          `${API_BASE_URL}/evaluations/${evaluationId}/results`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

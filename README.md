@@ -97,6 +97,7 @@ cd avaliacao-disciplinas
 npm --prefix backend ci
 npm --prefix frontend ci
 Copy-Item backend/.env.example backend/.env
+Copy-Item frontend/.env.example frontend/.env
 ```
 
 Preencha `backend/.env` com os dados de conexão do banco PostgreSQL e as configurações da API. Mantenha esse arquivo fora do Git.
@@ -110,6 +111,11 @@ Preencha `backend/.env` com os dados de conexão do banco PostgreSQL e as config
 | `JWT_SECRET` | Segredo longo e aleatório para assinar tokens JWT. |
 | `PORT` | Porta da API. O padrão é `3000`. |
 | `NODE_ENV` | Em `production`, a documentação Swagger fica desabilitada. |
+| `HTTPS_ENABLED` | `true` para HTTPS ou `false` para HTTP. Sem a variável, o modo HTTP é mantido. Configure em cada servidor. |
+| `HTTPS_CERT_PATH`, `HTTPS_KEY_PATH` | Caminhos do certificado e da chave privada locais, exigidos quando HTTPS está habilitado. |
+| `CORS_ORIGIN` | Origem permitida pelo backend. Por padrão, `http://localhost:5173` em HTTP e `https://localhost:5173` em HTTPS. |
+
+Em `frontend/.env`, `VITE_API_BASE_URL` define a URL pública da API. Apenas essa variável tem prefixo `VITE_`; certificados, chaves e segredos não devem ser expostos ao navegador. Reinicie os servidores depois de alterar os arquivos de ambiente. A URL do frontend compilado é definida durante o build.
 
 ### Preparação do esquema PostgreSQL
 
@@ -146,11 +152,53 @@ npm --prefix backend run start:dev
 npm --prefix frontend run dev
 ```
 
-Abra o [frontend](http://localhost:5173) no navegador. Por padrão, ele chama a API em `http://localhost:3000`. A configuração de CORS do backend aceita a origem `http://localhost:5173`. Se usar outro endereço, ajuste a URL da API no frontend ou a origem permitida no backend, conforme o endereço alterado.
+No modo HTTP, abra o [frontend](http://localhost:5173) no navegador. A API usa a porta `3000`, e o Vite mantém a porta `5173`, sem trocar automaticamente de porta se ela estiver ocupada. Os dois servidores escutam apenas em `localhost`. A URL da API é centralizada por `VITE_API_BASE_URL`; o backend autoriza somente a origem configurada em `CORS_ORIGIN`.
+
+### HTTPS local
+
+O HTTPS local foi validado em 20/11/2026 com certificados emitidos pelo mkcert e autoridade instalada no armazenamento de confiança do usuário no Windows. API, frontend, Swagger e documento OpenAPI responderam por HTTPS com TLS 1.3. O Brave reconheceu a conexão como segura.
+
+A validação manual confirmou consultas autenticadas entre frontend e API por HTTPS, com JWT Bearer e sem requisições HTTP indevidas nos fluxos consultados. O CORS permitiu a origem configurada e não autorizou uma origem externa. Conexões com autoridade não confiável ou hostname incompatível foram rejeitadas, assim como acessos HTTP simples às portas HTTPS.
+
+Use certificados de desenvolvimento emitidos pelo [mkcert](https://github.com/FiloSottile/mkcert). Depois de instalar a ferramenta, os comandos abaixo instalam sua autoridade local e geram um certificado para os endereços de loopback. Esse procedimento modifica o armazenamento de confiança do computador e deve ser feito conscientemente. Não sobrescreva certificados existentes.
+
+```powershell
+mkcert -install
+$certDir = 'C:\Projetos\certificados-avaliacao-disciplinas'
+New-Item -ItemType Directory -Path $certDir -Force | Out-Null
+if ((Test-Path "$certDir\localhost.pem") -or (Test-Path "$certDir\localhost-key.pem")) {
+    throw 'Os arquivos de certificado já existem; confira-os antes de continuar.'
+}
+mkcert -cert-file "$certDir\localhost.pem" -key-file "$certDir\localhost-key.pem" localhost 127.0.0.1 ::1
+```
+
+Em ambos os arquivos de ambiente locais, configure:
+
+```dotenv
+HTTPS_ENABLED=true
+HTTPS_CERT_PATH=C:/Projetos/certificados-avaliacao-disciplinas/localhost.pem
+HTTPS_KEY_PATH=C:/Projetos/certificados-avaliacao-disciplinas/localhost-key.pem
+```
+
+No backend, use `CORS_ORIGIN=https://localhost:5173`. No frontend, use `VITE_API_BASE_URL=https://localhost:3000`. Inicie os servidores com os mesmos comandos de desenvolvimento e abra `https://localhost:5173`. O Swagger estará em `https://localhost:3000/api/docs`, fora do modo de produção. Será necessário fazer login novamente, pois o `sessionStorage` é separado por origem.
+
+O modo HTTPS interrompe a inicialização quando os arquivos não podem ser lidos, o certificado e a chave são inválidos ou incompatíveis, o certificado está fora da validade ou não inclui `localhost`. O Vite também rejeita uma API HTTP no modo HTTPS. Não há retorno silencioso para HTTP. O build do frontend não lê os certificados nem depende de sua existência.
+
+O curl do Windows, usando Schannel, retornou `CRYPT_E_NO_REVOCATION_CHECK` ao tentar verificar a revogação do certificado local. Não foram usadas opções para ignorar revogação ou erros TLS. O Node com `--use-system-ca` validou a cadeia, a validade e o hostname usando as autoridades do Windows; o Brave também validou a conexão sem desabilitar TLS.
+
+Com a autoridade confiável e a API em execução, a consulta abaixo permite repetir a verificação pelo Node.js 24:
+
+```powershell
+node --use-system-ca -e "require('node:https').get('https://localhost:3000/', response => { console.log(response.statusCode); response.resume(); }).on('error', error => { console.error(error.message); process.exitCode = 1; });"
+```
+
+Clientes Node também podem receber o certificado público da autoridade por `NODE_EXTRA_CA_CERTS`. Nunca desabilite a validação TLS. Mantenha os certificados fora do repositório e não compartilhe a chave da autoridade (`rootCA-key.pem`). Para voltar ao HTTP local, use `HTTPS_ENABLED=false`, `CORS_ORIGIN=http://localhost:5173` e `VITE_API_BASE_URL=http://localhost:3000` nos respectivos ambientes.
+
+O mkcert é destinado ao desenvolvimento. Uma implantação institucional requer certificados públicos ou institucionais, renovação e configuração própria do servidor ou proxy reverso; o servidor de desenvolvimento Vite não substitui essa infraestrutura.
 
 ### Swagger e OpenAPI
 
-Com o backend rodando em desenvolvimento, abra o [Swagger UI](http://localhost:3000/api/docs) ou o [OpenAPI em JSON](http://localhost:3000/api/docs-json). Para testar uma rota protegida, faça login em `POST /auth/login` e cole o `accessToken` em **Authorize** no Swagger UI. O login e a rota raiz são públicos.
+No modo HTTP de desenvolvimento, abra o [Swagger UI](http://localhost:3000/api/docs) ou o [OpenAPI em JSON](http://localhost:3000/api/docs-json). Com HTTPS habilitado, use o [Swagger UI seguro](https://localhost:3000/api/docs) ou o [JSON por HTTPS](https://localhost:3000/api/docs-json). Para testar uma rota protegida, faça login em `POST /auth/login` e cole o `accessToken` em **Authorize** no Swagger UI. O login e a rota raiz são públicos.
 
 A especificação OpenAPI 3.0.0 tem 55 operações e 26 esquemas, com autenticação Bearer em 53 operações. A documentação descreve parâmetros, corpos de requisição e códigos de resposta. Os erros retornam `statusCode` e `message`, que pode ser uma lista quando há erros de validação.
 
@@ -169,7 +217,18 @@ npm --prefix backend run lint
 npm --prefix frontend run lint
 ```
 
-Os testes unitários do backend usam dependências simuladas. Os do frontend verificam o conteúdo do CSV e a proteção dos dados exportados.
+Os testes unitários do backend usam dependências simuladas. Os do frontend verificam o CSV, a proteção dos dados exportados, a situação dos períodos, a URL da API e a configuração do servidor local.
+
+Na validação de 20/11/2026, os 480 testes automatizados passaram, sem falhas ou testes ignorados:
+
+| Grupo | Testes aprovados | Organização |
+| --- | --- | --- |
+| Unitários do backend | 433 | 18 suítes |
+| Integração HTTP | 7 | 2 suítes |
+| Frontend | 40 | 4 arquivos |
+| **Total** | **480** | |
+
+Os builds e lints dos dois projetos passaram; o lint do backend manteve três avisos em testes existentes. O build do frontend também passou com HTTPS habilitado e caminhos de certificados inexistentes. Os testes de configuração não instalam certificados; a confiança TLS foi conferida separadamente com certificados reais, Node e Brave.
 
 ### Testes HTTP
 
@@ -181,7 +240,7 @@ npm --prefix backend run test:e2e -- --runInBand
 
 A suíte de auditoria precisa de uma instância PostgreSQL isolada com o esquema já preparado. Configure `DB_HOST=127.0.0.1`, `DB_PORT=55487`, `DB_DATABASE=unixs_audit_test` e `DB_USERNAME=unixs_audit_test`. A suíte só é habilitada quando `UNIXS_AUDIT_TEST_DATA_DIRECTORY` aponta para o diretório de dados da instância. Antes de iniciar a aplicação, ela confere a identidade do banco. As operações de teste usam dados fictícios.
 
-Passaram 402 testes unitários do backend em 17 suítes, sete testes HTTP em duas suítes e três testes do frontend. Os testes HTTP rodaram em uma cópia isolada do banco e verificaram permissões, autoria das operações e reversão de alterações em caso de falha na auditoria.
+Os sete testes HTTP passaram em duas suítes na validação de 20/11/2026. A instância isolada recebeu somente o esquema da plataforma, sem registros reais, e os testes criaram dados fictícios. Antes da execução, foram conferidos host, porta, banco, usuário e diretório de dados. A instância foi encerrada ao final. Os testes verificaram permissões, autoria das operações, proteção dos metadados e reversão de alterações em caso de falha na auditoria. O banco principal foi consultado somente para leitura, e suas contagens, hashes e estrutura permaneceram iguais.
 
 ## Backup e restauração do PostgreSQL
 
@@ -210,7 +269,7 @@ O catálogo, a leitura integral do arquivo e o SHA-256 foram conferidos. O backu
 
 ## Matriz de requisitos e evidências
 
-A matriz segue as seções 1 a 11 da especificação da UniXS. A entrega acadêmica roda localmente em um banco com o esquema preparado. Para uma implantação institucional, ainda é preciso configurar HTTPS, versionar as mudanças do banco e testar a capacidade do ambiente.
+A matriz segue as seções 1 a 11 da especificação da UniXS. A entrega acadêmica roda localmente em um banco com o esquema preparado. O HTTPS foi verificado nesse ambiente. Uma implantação institucional ainda exige certificados e infraestrutura HTTPS próprios de produção, mudanças do banco versionadas e testes da capacidade do ambiente.
 
 | Seção e requisito | Classificação | Evidência ou limite |
 | --- | --- | --- |
@@ -223,7 +282,7 @@ A matriz segue as seções 1 a 11 da especificação da UniXS. A entrega acadêm
 | 7 e 10 · Filtros da coordenação e histórico | Atendido e verificado | Testes de filtros, períodos, mínimo de respostas, médias ponderadas e compatibilidade das perguntas. |
 | 8 e 10 · Ações e acompanhamento de melhoria | Atendido e verificado | Cadastro, atribuição e histórico dos planos. Os testes da comparação cobrem acesso, origem, período e divulgação. |
 | 11 · Auditoria administrativa | Atendido e verificado | Testes em instância isolada cobrem autoria, metadados, proteção, rejeições e reversão. O cadastro pelo script e as alterações diretas no banco ficam fora da trilha. |
-| 11 · Comunicação segura | Não atendido | O ambiente local usa HTTP. Uma implantação institucional exige HTTPS para frontend e API. |
+| 11 · Comunicação segura | Atendido e verificado em ambiente local | Certificados confiáveis, TLS 1.3, CORS e consultas autenticadas por HTTPS validados com Node e Brave em 20/11/2026. A implantação institucional exige certificados e infraestrutura próprios de produção. |
 | 11 · Responsividade, usabilidade e acessibilidade | Parcialmente atendido | Telas principais verificadas em desktop e celular. A cobertura de navegadores e a avaliação de acessibilidade ainda são limitadas. |
 | 11 · Capacidade para picos de acesso | Parcialmente atendido | O envio usa transações e a análise agrega os resultados em SQL. Há testes de concorrência na auditoria. Falta testar a carga esperada no fim de um período de avaliação. |
 | 11 · Arquitetura, testes, versionamento e API | Atendido e verificado | Separação por camadas, versionamento com Git, testes automatizados e documentação OpenAPI. |

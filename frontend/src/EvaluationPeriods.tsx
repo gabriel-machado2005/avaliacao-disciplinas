@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "./api-config";
 import { useEffect, useState, type FormEvent } from "react";
 
 type EvaluationPeriod = {
@@ -65,7 +66,7 @@ export default function EvaluationPeriods({
         }
 
         const response = await fetch(
-          "http://localhost:3000/evaluations/periods",
+          `${API_BASE_URL}/evaluations/periods`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -156,7 +157,7 @@ export default function EvaluationPeriods({
       }
 
       const response = await fetch(
-        `http://localhost:3000/evaluations/periods/${period.id}`,
+        `${API_BASE_URL}/evaluations/periods/${period.id}`,
         {
           method: "DELETE",
           headers: {
@@ -256,8 +257,8 @@ export default function EvaluationPeriods({
       }
 
       const url = isEditing
-        ? `http://localhost:3000/evaluations/periods/${editingPeriodId}`
-        : "http://localhost:3000/evaluations/periods";
+        ? `${API_BASE_URL}/evaluations/periods/${editingPeriodId}`
+        : `${API_BASE_URL}/evaluations/periods`;
 
       const payload: {
         name: string;

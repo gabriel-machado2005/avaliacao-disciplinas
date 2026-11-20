@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "./api-config";
 import { useEffect, useState } from "react";
 import EvaluationResults from "./EvaluationResults";
 import { getEvaluationPeriodStatus } from "./evaluation-period-status";
@@ -51,8 +52,8 @@ export default function ProfessorEvaluations({
 
         const endpoint =
           role === "PROFESSOR"
-            ? "http://localhost:3000/evaluations/professor/my"
-            : "http://localhost:3000/evaluations";
+            ? `${API_BASE_URL}/evaluations/professor/my`
+            : `${API_BASE_URL}/evaluations`;
 
         const response = await fetch(endpoint, {
           headers: {

@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "./api-config";
 import { useState, type FormEvent } from "react";
 
 type QuestionType = "SCALE" | "SINGLE_CHOICE" | "TEXT";
@@ -115,7 +116,7 @@ export default function QuestionnaireQuestions({
       }
 
       const response = await fetch(
-        `http://localhost:3000/questionnaires/dimensions/${dimensionId}/questions`,
+        `${API_BASE_URL}/questionnaires/dimensions/${dimensionId}/questions`,
         {
           method: "POST",
           headers: {

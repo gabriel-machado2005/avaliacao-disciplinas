@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "./api-config";
 import { useEffect, useState, type FormEvent } from "react";
 
 type Discipline = {
@@ -71,19 +72,19 @@ export default function AcademicClasses({ role }: AcademicClassesProps) {
           termsResponse,
           classesResponse,
         ] = await Promise.all([
-          fetch("http://localhost:3000/academic/disciplines", {
+          fetch(`${API_BASE_URL}/academic/disciplines`, {
             headers,
             signal: controller.signal,
           }),
-          fetch("http://localhost:3000/users/professors", {
+          fetch(`${API_BASE_URL}/users/professors`, {
             headers,
             signal: controller.signal,
           }),
-          fetch("http://localhost:3000/academic/terms", {
+          fetch(`${API_BASE_URL}/academic/terms`, {
             headers,
             signal: controller.signal,
           }),
-          fetch("http://localhost:3000/academic/classes", {
+          fetch(`${API_BASE_URL}/academic/classes`, {
             headers,
             signal: controller.signal,
           }),
@@ -185,7 +186,7 @@ export default function AcademicClasses({ role }: AcademicClassesProps) {
       }
 
       const response = await fetch(
-        `http://localhost:3000/academic/classes/${item.id}`,
+        `${API_BASE_URL}/academic/classes/${item.id}`,
         {
           method: "DELETE",
           headers: {
@@ -249,8 +250,8 @@ export default function AcademicClasses({ role }: AcademicClassesProps) {
       }
 
       const url = isEditing
-        ? `http://localhost:3000/academic/classes/${editingClassId}`
-        : "http://localhost:3000/academic/classes";
+        ? `${API_BASE_URL}/academic/classes/${editingClassId}`
+        : `${API_BASE_URL}/academic/classes`;
 
       const response = await fetch(url, {
         method: isEditing ? "PATCH" : "POST",

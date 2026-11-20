@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "./api-config";
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import EvaluationQuestionnaire, {
@@ -84,7 +85,7 @@ function App() {
       try {
         const token = sessionStorage.getItem("accessToken");
 
-        const response = await fetch("http://localhost:3000/evaluations/my", {
+        const response = await fetch(`${API_BASE_URL}/evaluations/my`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -145,7 +146,7 @@ function App() {
     setLoading(true);
 
     try {
-      const response = await fetch("http://localhost:3000/auth/login", {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -188,7 +189,7 @@ function App() {
       const token = sessionStorage.getItem("accessToken");
 
       const response = await fetch(
-        `http://localhost:3000/evaluations/${evaluationId}/questionnaire`,
+        `${API_BASE_URL}/evaluations/${evaluationId}/questionnaire`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
