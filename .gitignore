@@ -36,3 +36,8 @@ certificates/
 EvaluationResults.txt
 EvaluationsService.txt
 QuestionnaireManagement.txt
+
+# Artefatos locais de testes de carga
+tests/load/.local/
+tests/load/results/
+tests/load/fixtures-private*.json

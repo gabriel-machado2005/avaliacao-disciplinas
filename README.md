@@ -242,6 +242,77 @@ A suíte de auditoria precisa de uma instância PostgreSQL isolada com o esquema
 
 Os sete testes HTTP passaram em duas suítes na validação de 20/11/2026. A instância isolada recebeu somente o esquema da plataforma, sem registros reais, e os testes criaram dados fictícios. Antes da execução, foram conferidos host, porta, banco, usuário e diretório de dados. A instância foi encerrada ao final. Os testes verificaram permissões, autoria das operações, proteção dos metadados e reversão de alterações em caso de falha na auditoria. O banco principal foi consultado somente para leitura, e suas contagens, hashes e estrutura permaneceram iguais.
 
+### Testes de carga
+
+Em 20/11/2026, foram aprovados 19 ensaios com k6 2.4.0: uma verificação inicial e três repetições de cada um dos outros seis cenários. Os **480 testes automatizados da plataforma**, os **37 testes automatizados dos scripts de carga** e os **19 ensaios de desempenho** são contabilizados separadamente.
+
+| Cenário | Perfil de carga | Ensaios aprovados | Requisições | Submissões aceitas |
+| --- | --- | ---: | ---: | ---: |
+| 1 — Verificação inicial | 1 usuário virtual, 10 jornadas completas | 1 | 40 | 10 |
+| 2 — Pico de login | 1, 2 e 5 logins/s, por 60 s em cada patamar | 3 | 1.444 | 0 |
+| 3 — Consultas simultâneas | 5, 10 e 25 usuários virtuais, rampas de 15 s e patamares de 120 s | 3 | 15.537 | 0 |
+| 4 — Jornada completa | 1, 2 e 5 jornadas/s por 120 s; depois 5/s por 300 s | 3 | 29.552 | 7.388 |
+| 5 — Carga mista | 5 jornadas/s por 300 s, cinco leitores e dois gestores | 3 | 23.199 | 4.503 |
+| 6 — Duplicidade concorrente | 100 estudantes por repetição, com cinco envios concorrentes por estudante e 10 usuários virtuais | 3 | 1.800 | 300 |
+| 7 — Pico e recuperação | Rampa de 5 a 20 jornadas/s em 15 s, pico por 30 s, retorno a 5/s em 15 s e recuperação por 60 s | 3 | 15.296 | 3.824 |
+| **Total** | | **19** | **86.868** | **16.025** |
+
+Uma jornada completa inclui login, listagem das avaliações, carregamento do questionário e envio, com uma pausa de um segundo. Nos ensaios aprovados houve **zero erros inesperados** e **1.200 rejeições esperadas de duplicidade**. Cada grupo de cinco envios concorrentes teve um HTTP 201 e quatro HTTP 400 com a mensagem específica de avaliação já respondida. As verificações funcionais posteriores à carga não entram no total de requisições do k6.
+
+#### Ambiente e critérios
+
+A API independente usou `https://localhost:3001` e o PostgreSQL isolado usou `127.0.0.1:55487`, com banco e usuário exclusivos `unixs_load_test`. Os scripts conferem banco, usuário, porta, diretório de dados, processos e certificado antes das operações. Os dados são fictícios e ficam fora do Git. A validação TLS permaneceu ativa; o banco principal não foi acessado durante os testes de carga.
+
+O computador tinha processador Intel Core Ultra 5 115U, oito núcleos físicos e dez processadores lógicos, 16 GB de RAM (15,50 GiB utilizáveis), SSD NVMe de 512 GB e Windows 11. Foram usados Node.js 24.21.0 e PostgreSQL 18.6, com `shared_buffers` de 128 MiB, `work_mem` de 4 MiB, limite de 100 conexões, `fsync` e `synchronous_commit` ativos. Gerador, API e banco compartilharam o mesmo computador.
+
+| Operação | Média máxima | p95 máximo | p99 máximo |
+| --- | ---: | ---: | ---: |
+| Login | 1 s | 2 s | 3 s |
+| Listagem e questionário | 500 ms | 1 s | 2 s |
+| Envio | 1 s | 2 s | 4 s |
+| Resultados e análise histórica | 1,5 s | 3 s | 5 s |
+
+Além desses limites, a aprovação exige erros inesperados abaixo de 1%, todas as checagens funcionais corretas, nenhuma iteração descartada nos executores de chegada e conciliação dos envios com os registros persistidos. No cenário 4, os limites de latência valem para o patamar nominal. No cenário 7, valem para operações concluídas a partir de 90 s, incluindo a cauda de término das jornadas em curso.
+
+Os cenários 2, 4 e 5 conciliam contagens por patamar e admitem no máximo uma chegada adicional na fronteira temporal de cada executor constante. Nenhuma requisição é descartada para ajustar o total. Contas e habilitações são separadas por patamar e repetição. A coleta interrompe o gerador se houver falha de medição, menos de 1 GiB de memória livre ou CPU global acima de 95% por mais de 30 s. A progressão para o cenário 7 depende da aprovação dos anteriores.
+
+#### Desempenho observado
+
+Todos os critérios aplicáveis passaram nos 19 ensaios aprovados. A tabela apresenta o **maior valor observado entre as três repetições** de cada métrica, em milissegundos. Não se calculou média de percentis; cada coluna pode corresponder a uma repetição diferente.
+
+| Cenário e operação | Média | p95 | p99 |
+| --- | ---: | ---: | ---: |
+| 5 — Login | 81,33 | 101,79 | 113,01 |
+| 5 — Listagem | 7,94 | 11,91 | 27,97 |
+| 5 — Questionário | 7,17 | 12,38 | 21,31 |
+| 5 — Envio | 29,38 | 43,76 | 62,83 |
+| 5 — Resultados | 68,99 | 91,47 | 396,20 |
+| 5 — Análise histórica | 187,70 | 216,83 | 240,41 |
+| 7 — Login na recuperação | 77,10 | 95,51 | 102,62 |
+| 7 — Listagem na recuperação | 5,73 | 9,43 | 11,19 |
+| 7 — Questionário na recuperação | 6,10 | 10,38 | 13,08 |
+| 7 — Envio na recuperação | 28,68 | 42,96 | 54,38 |
+
+A carga mista processou de 25,34 a 25,51 requisições/s por repetição. O cenário 7 concluiu 1.275, 1.274 e 1.275 jornadas, com 42,09 a 42,15 requisições/s no ensaio inteiro, sem descartes e com recuperação dentro dos limites. Esses valores globais incluem rampas e recuperação; não representam o RPS exclusivo do patamar de 20 jornadas/s.
+
+A CPU global máxima amostrada foi de 68%, e a memória livre mínima foi de 2,07 GiB. Não houve interrupção por recursos ou deadlocks nos ensaios aprovados. A conferência final validou 16 tabelas e 21 chaves estrangeiras, sem referências órfãs ou pares de respostas duplicados. Os envios confirmados corresponderam às submissões e elegibilidades concluídas; as verificações também cobriram permissões, anonimato, comentários protegidos e resultados abertos ou insuficientes.
+
+#### Ocorrências e limites da validação
+
+Os totais aprovados excluem três tentativas técnicas reprovadas: uma falha de conexão pela escolha IPv4/IPv6, uma asserção que esperava HTTP 200 no login em vez de 201 e uma execução com 483 logins rejeitada pelo critério inicial de exatamente 480. Esse último critério foi corrigido para considerar as fronteiras temporais, com contagem verificável por patamar. As evidências originais permanecem preservadas, sem aprovação retroativa.
+
+Uma repetição do cenário 5 ficou inconclusiva por suspensão do Windows, confirmada pelos eventos Kernel-Power 506/507 e por uma lacuna de 208,43 s na coleta. Sem resumo final do k6, não há métricas completas dessa execução. Suas 509 submissões e 10.180 respostas foram preservadas e excluídas dos totais aprovados. Após o ajuste das configurações de energia, a repetição foi substituída por uma nova partição, e os oito ensaios restantes passaram, sem novas suspensões nas janelas medidas.
+
+A base é sintética, com uma disciplina, três turmas e questionário de 20 perguntas; cresce entre partições, e os caches aquecem durante a campanha. A coleta de recursos é periódica, não contínua; o cenário 6 é curto e não permite concluir sobre seu pico real de recursos. Os contadores PostgreSQL são assíncronos e incluem o monitor, por isso não substituem a conferência SQL. Percentis com poucas amostras são indicativos, inclusive na recuperação. Não há métricas exclusivas do patamar máximo do cenário 7, ensaio de saturação máxima, teste prolongado, renderização React ou virada do prazo durante um envio. A verificação de anonimato não é um estudo de reidentificação temporal.
+
+**Os resultados atendem aos perfis locais ensaiados e não comprovam a capacidade de uma infraestrutura institucional de produção.** Uma implantação exige repetir os testes com hardware, rede, volume de dados e metas próprios.
+
+As instruções de preparação, execução sequencial, verificação e encerramento estão em [Testes locais de carga](tests/load/README.md). Elas exigem certificados confiáveis e uma exportação externa somente do esquema, sem dados reais; o repositório continua sem inicialização automática de banco vazio. Os relatórios completos, manifests de contas e evidências brutas ficam em armazenamento privado, fora do Git. Para testar apenas os scripts, sem iniciar carga:
+
+```powershell
+node --test tests/load/test/*.test.mjs
+```
+
 ## Backup e restauração do PostgreSQL
 
 Use versões de `pg_dump` e `pg_restore` compatíveis com o servidor.
@@ -284,7 +355,7 @@ A matriz segue as seções 1 a 11 da especificação da UniXS. A entrega acadêm
 | 11 · Auditoria administrativa | Atendido e verificado | Testes em instância isolada cobrem autoria, metadados, proteção, rejeições e reversão. O cadastro pelo script e as alterações diretas no banco ficam fora da trilha. |
 | 11 · Comunicação segura | Atendido e verificado em ambiente local | Certificados confiáveis, TLS 1.3, CORS e consultas autenticadas por HTTPS validados com Node e Brave em 20/11/2026. A implantação institucional exige certificados e infraestrutura próprios de produção. |
 | 11 · Responsividade, usabilidade e acessibilidade | Parcialmente atendido | Telas principais verificadas em desktop e celular. A cobertura de navegadores e a avaliação de acessibilidade ainda são limitadas. |
-| 11 · Capacidade para picos de acesso | Parcialmente atendido | O envio usa transações e a análise agrega os resultados em SQL. Há testes de concorrência na auditoria. Falta testar a carga esperada no fim de um período de avaliação. |
+| 11 · Capacidade para picos de acesso | Atendido e verificado em ambiente local, nos perfis de carga ensaiados | Sete cenários com k6 e 19 ensaios aprovados: 86.868 requisições, 16.025 submissões aceitas e zero erros inesperados. Integridade, duplicidade, divulgação e recuperação verificadas. Os resultados não comprovam capacidade institucional de produção. |
 | 11 · Arquitetura, testes, versionamento e API | Atendido e verificado | Separação por camadas, versionamento com Git, testes automatizados e documentação OpenAPI. |
 | 11 · Backup e restauração | Atendido e verificado | Restauração isolada de 17/11/2026 com 16 tabelas e teste da auditoria na cópia. |
 | Implantação institucional · Migrações versionadas | Não atendido | A sincronização do esquema e a instalação de extensões estão desabilitadas na inicialização. Falta um procedimento versionado para criar e atualizar o esquema. |
