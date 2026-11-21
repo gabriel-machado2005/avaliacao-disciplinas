@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import ImprovementPlanComparison from "./ImprovementPlanComparison";
 import { apiPath, errorMessage, request } from "./improvement-plans-api";
+import { useViewFocus } from "./use-view-focus";
 
 type Role = "ADMIN" | "COORDINATOR" | "PROFESSOR";
 type Status = "PENDING" | "IN_PROGRESS" | "COMPLETED";
@@ -156,11 +157,11 @@ function Feedback({ error, success }: { error?: string; success?: string }) {
   );
 }
 
-function PlanOverview({ plan }: { plan: Plan }) {
+function PlanOverview({ plan, headingId }: { plan: Plan; headingId?: string }) {
   return (
     <>
       <div className="ui-card__header">
-        <h3 className="ui-card__title">
+        <h3 className="ui-card__title" id={headingId}>
           {plan.discipline.code} · {plan.discipline.name}
         </h3>
         <StatusBadge status={plan.status} />
@@ -249,6 +250,7 @@ function PlanDetails({
             type="button"
             className="ui-btn ui-btn--secondary"
             disabled={saving}
+            data-focus-id={`edit-plan-${id}`}
             onClick={() => onEdit(plan)}
           >
             Editar plano
@@ -264,7 +266,7 @@ function PlanDetails({
       {plan && (
         <>
           <article className="evaluation-card ui-card improvement-plans__section">
-            <PlanOverview plan={plan} />
+            <PlanOverview plan={plan} headingId="plan-detail-heading" />
             <dl className="improvement-plans__description">
               <dt>Problema identificado</dt>
               <dd>{plan.problem}</dd>
@@ -450,7 +452,7 @@ function PlanEditor({
 
   return (
     <form className="evaluation-card ui-form" onSubmit={save}>
-      <h3>
+      <h3 id="plan-editor-heading">
         {plan ? "Editar plano de melhoria" : "Cadastrar plano de melhoria"}
       </h3>
       <Feedback error={error} />
@@ -620,6 +622,15 @@ export default function ImprovementPlans({ role }: { role: Role }) {
 
   const plans = list?.version === loadVersion ? list.plans : undefined;
   const listError = list?.version === loadVersion ? list.error : undefined;
+  const rememberFocus = useViewFocus(
+    view.kind === "detail" ? `detail-${view.id}` : view.kind,
+    view.kind === "form"
+      ? "#plan-editor-heading"
+      : view.kind === "detail"
+        ? "#plan-detail-heading"
+        : "#improvement-plans-heading",
+    view.kind !== "list" || Boolean(plans || listError),
+  );
   const disciplines = uniqueOptions(
     (plans ?? []).map(({ discipline }) => ({
       id: discipline.id,
@@ -676,6 +687,7 @@ export default function ImprovementPlans({ role }: { role: Role }) {
           canManage={canManage}
           onBack={goToList}
           onEdit={(plan) => {
+            rememberFocus(`edit-plan-${plan.id}`);
             setSuccess("");
             setView({ kind: "form", plan });
           }}
@@ -693,7 +705,11 @@ export default function ImprovementPlans({ role }: { role: Role }) {
               <button
                 type="button"
                 className="ui-btn ui-btn--primary"
-                onClick={() => setView({ kind: "form" })}
+                data-focus-id="new-plan"
+                onClick={() => {
+                  rememberFocus("new-plan");
+                  setView({ kind: "form" });
+                }}
               >
                 Novo plano
               </button>
@@ -786,7 +802,11 @@ export default function ImprovementPlans({ role }: { role: Role }) {
                     <button
                       type="button"
                       className="ui-btn ui-btn--secondary"
-                      onClick={() => setView({ kind: "detail", id: plan.id })}
+                      data-focus-id={`plan-${plan.id}`}
+                      onClick={() => {
+                        rememberFocus(`plan-${plan.id}`);
+                        setView({ kind: "detail", id: plan.id });
+                      }}
                     >
                       Ver plano
                     </button>

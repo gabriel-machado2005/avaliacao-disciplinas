@@ -8,7 +8,7 @@ Desenvolvi esta plataforma durante o estágio obrigatório de Ciência da Comput
 | --- | --- |
 | Frontend | React, TypeScript, Vite e CSS. Telas por perfil, gráficos e exportação em CSV. |
 | Backend | Node.js, NestJS, TypeScript, TypeORM e PostgreSQL. A API REST usa Passport com JWT para autenticação e bcrypt para armazenar hashes de senhas. |
-| Testes e documentação | Jest e NestJS Testing no backend, Node Test Runner no frontend, Oxlint, ESLint e Swagger/OpenAPI. |
+| Testes e documentação | Jest e NestJS Testing no backend, Node Test Runner e Playwright com axe-core no frontend, Oxlint, ESLint e Swagger/OpenAPI. |
 
 O frontend consome a API REST. No backend, o código é dividido em módulos de autenticação, usuários, gestão acadêmica, questionários, avaliações, planos de melhoria e auditoria.
 
@@ -84,6 +84,18 @@ A tabela `administrative_audit_events` guarda o ID do usuário autenticado, a a�
 - **Planos de melhoria** — cadastro, edição e mudanças no vínculo de acompanhamento. As mudanças de situação ficam no histórico do próprio plano, inclusive quando feitas pelo professor.
 
 Os eventos guardam apenas metadados da operação, sem senhas, hashes, tokens, respostas, comentários ou corpos de requisição. A consulta dos eventos é feita por quem tem acesso autorizado ao PostgreSQL. A API ainda não tem uma rota para listar eventos de auditoria.
+
+## Responsividade, usabilidade e acessibilidade
+
+A interface mantém os cartões, formulários e estilos da plataforma. Os ajustes incluem espaçamento para telas pequenas, limites de largura dos campos e correções de transbordamento em formulários. Também foram corrigidos o contraste localizado do menu administrativo, o idioma da página para `pt-BR`, o título da aba e a indicação de obrigatoriedade das perguntas discursivas.
+
+A hierarquia dos títulos foi ajustada preservando sua aparência. A navegação interna direciona o foco à tela de destino e restaura o acionador ao retornar, quando ele ainda existe. O carregamento inicial e a atualização com F5 não direcionam automaticamente o foco aos títulos. Os indicadores visuais de navegação por teclado foram preservados.
+
+Os quatro perfis foram avaliados em larguras de **360, 390, 768, 1024, 1366 e 1920 pixels**. Os testes de navegador cobrem menus, formulários, questionários, cartões, resultados, gráficos, planos de melhoria e estados de erro ou conteúdo protegido. Conferem limites horizontais de controles e indicadores, possibilidade de acionar botões, foco e regras automáticas de acessibilidade. As **474 verificações axe-core** da execução final não detectaram violações nem itens inconclusivos nas regras selecionadas.
+
+**Limitação visual conhecida:** após o login, o título pode apresentar um contorno azul de foco. O contorno desaparece ao atualizar a página com F5 e não impede a utilização da plataforma. Esse comportamento foi mantido como limitação conhecida; os indicadores de foco durante a navegação por teclado continuam disponíveis.
+
+Esses resultados se limitam aos cenários avaliados e **não representam conformidade integral com WCAG**. Ainda são necessárias verificações com leitores de tela, dispositivos reais, teclado virtual, zoom de 200% e uma variedade maior de navegadores e configurações pessoais. A suíte principal usa Chromium e respostas fictícias da API; as consultas e permissões reais do backend têm testes separados.
 
 ## Instalação local
 
@@ -219,14 +231,15 @@ npm --prefix frontend run lint
 
 Os testes unitários do backend usam dependências simuladas. Os do frontend verificam o CSV, a proteção dos dados exportados, a situação dos períodos, a URL da API e a configuração do servidor local.
 
-Na validação de 20/11/2026, os 480 testes automatizados passaram, sem falhas ou testes ignorados:
+O resultado consolidado das validações de 20/11/2026 é de **726 testes automatizados da plataforma aprovados**, sem falhas ou testes ignorados nas execuções finais:
 
 | Grupo | Testes aprovados | Organização |
 | --- | --- | --- |
 | Unitários do backend | 433 | 18 suítes |
 | Integração HTTP | 7 | 2 suítes |
-| Frontend | 40 | 4 arquivos |
-| **Total** | **480** | |
+| Testes existentes do frontend | 40 | 4 arquivos |
+| Navegador | 246 | 41 casos em seis larguras |
+| **Total** | **726** | |
 
 Os builds e lints dos dois projetos passaram; o lint do backend manteve três avisos em testes existentes. O build do frontend também passou com HTTPS habilitado e caminhos de certificados inexistentes. Os testes de configuração não instalam certificados; a confiança TLS foi conferida separadamente com certificados reais, Node e Brave.
 
@@ -242,9 +255,24 @@ A suíte de auditoria precisa de uma instância PostgreSQL isolada com o esquema
 
 Os sete testes HTTP passaram em duas suítes na validação de 20/11/2026. A instância isolada recebeu somente o esquema da plataforma, sem registros reais, e os testes criaram dados fictícios. Antes da execução, foram conferidos host, porta, banco, usuário e diretório de dados. A instância foi encerrada ao final. Os testes verificaram permissões, autoria das operações, proteção dos metadados e reversão de alterações em caso de falha na auditoria. O banco principal foi consultado somente para leitura, e suas contagens, hashes e estrutura permaneceram iguais.
 
+### Testes de navegador
+
+Com as dependências instaladas, prepare o Chromium do Playwright e execute a suíte:
+
+```powershell
+cd frontend
+npx playwright install chromium
+npm run test:ui
+cd ..
+```
+
+A suíte inicia um Vite exclusivo em `https://localhost:5174`, sem iniciar o backend ou acessar PostgreSQL. Use certificados locais confiáveis, conforme as instruções de [validação de interface](frontend/e2e/README.md). A validação TLS permanece ativa. A API é fictícia, e requisições não previstas são bloqueadas antes da rede.
+
+Os 246 testes passaram nos quatro perfis e nas seis larguras, incluindo navegação por mouse e teclado, montagem/F5, retorno ao acionador, carregamentos pendentes e regressões do foco após substituição do módulo. A execução produziu 474 verificações axe-core sem violações detectadas ou itens inconclusivos. O estilo calculado de foco também foi conferido, inclusive com `:focus-visible` forçado como condição de teste. As capturas e os relatórios brutos ficam fora do Git. As verificações automatizadas não substituem as conferências manuais e não eliminam a limitação visual conhecida após o login.
+
 ### Testes de carga
 
-Em 20/11/2026, foram aprovados 19 ensaios com k6 2.4.0: uma verificação inicial e três repetições de cada um dos outros seis cenários. Os **480 testes automatizados da plataforma**, os **37 testes automatizados dos scripts de carga** e os **19 ensaios de desempenho** são contabilizados separadamente.
+Em 20/11/2026, foram aprovados 19 ensaios com k6 2.4.0: uma verificação inicial e três repetições de cada um dos outros seis cenários. Os **726 testes automatizados da plataforma**, os **37 testes automatizados dos scripts de carga** e os **19 ensaios de desempenho** são contabilizados separadamente.
 
 | Cenário | Perfil de carga | Ensaios aprovados | Requisições | Submissões aceitas |
 | --- | --- | ---: | ---: | ---: |
@@ -354,7 +382,7 @@ A matriz segue as seções 1 a 11 da especificação da UniXS. A entrega acadêm
 | 8 e 10 · Ações e acompanhamento de melhoria | Atendido e verificado | Cadastro, atribuição e histórico dos planos. Os testes da comparação cobrem acesso, origem, período e divulgação. |
 | 11 · Auditoria administrativa | Atendido e verificado | Testes em instância isolada cobrem autoria, metadados, proteção, rejeições e reversão. O cadastro pelo script e as alterações diretas no banco ficam fora da trilha. |
 | 11 · Comunicação segura | Atendido e verificado em ambiente local | Certificados confiáveis, TLS 1.3, CORS e consultas autenticadas por HTTPS validados com Node e Brave em 20/11/2026. A implantação institucional exige certificados e infraestrutura próprios de produção. |
-| 11 · Responsividade, usabilidade e acessibilidade | Parcialmente atendido | Telas principais verificadas em desktop e celular. A cobertura de navegadores e a avaliação de acessibilidade ainda são limitadas. |
+| 11 · Responsividade, usabilidade e acessibilidade | Atendido e verificado nos cenários avaliados | Quatro perfis e seis larguras, com 246 testes de navegador e 474 verificações axe-core sem violações detectadas. Sem declaração de conformidade integral com WCAG. O contorno de foco após login permanece como limitação visual conhecida; dispositivos reais, leitores de tela, zoom e outros ambientes exigem validação complementar. |
 | 11 · Capacidade para picos de acesso | Atendido e verificado em ambiente local, nos perfis de carga ensaiados | Sete cenários com k6 e 19 ensaios aprovados: 86.868 requisições, 16.025 submissões aceitas e zero erros inesperados. Integridade, duplicidade, divulgação e recuperação verificadas. Os resultados não comprovam capacidade institucional de produção. |
 | 11 · Arquitetura, testes, versionamento e API | Atendido e verificado | Separação por camadas, versionamento com Git, testes automatizados e documentação OpenAPI. |
 | 11 · Backup e restauração | Atendido e verificado | Restauração isolada de 17/11/2026 com 16 tabelas e teste da auditoria na cópia. |

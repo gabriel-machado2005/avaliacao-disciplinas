@@ -1,6 +1,7 @@
 import { API_BASE_URL } from "./api-config";
 import { useState } from "react";
 import type { FormEvent } from "react";
+import { useViewFocus } from "./use-view-focus";
 
 type Question = {
   id: string;
@@ -42,6 +43,10 @@ export default function EvaluationQuestionnaire({ data, onBack }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
+  useViewFocus(
+    submitted ? "submitted" : "questionnaire",
+    ".questionnaire-heading",
+  );
 
   function updateAnswer(questionId: string, value: string) {
     setAnswers((previous) => ({
@@ -133,7 +138,7 @@ export default function EvaluationQuestionnaire({ data, onBack }: Props) {
   if (submitted) {
     return (
       <div className="evaluation-card ui-card">
-        <h2>Avaliação enviada!</h2>
+        <h1 className="questionnaire-heading">Avaliação enviada!</h1>
 
         <p className="ui-feedback ui-feedback--success" role="status">
           Suas respostas foram registradas com sucesso.
@@ -154,11 +159,11 @@ export default function EvaluationQuestionnaire({ data, onBack }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="ui-form">
-      <h2>{data.questionnaire.name}</h2>
+      <h1 className="questionnaire-heading">{data.questionnaire.name}</h1>
 
       {data.questionnaire.dimensions.map((dimension) => (
         <section key={dimension.id} className="evaluation-card ui-card">
-          <h3 className="ui-card__title">{dimension.name}</h3>
+          <h2 className="ui-card__title">{dimension.name}</h2>
 
           {dimension.questions.map((question) => (
             <div key={question.id} className="form-group">
@@ -236,7 +241,11 @@ export default function EvaluationQuestionnaire({ data, onBack }: Props) {
                   <textarea
                     id={question.id}
                     rows={4}
-                    placeholder="Digite seu comentário (opcional)"
+                    placeholder={
+                      question.required
+                        ? "Digite seu comentário (obrigatório)"
+                        : "Digite seu comentário (opcional)"
+                    }
                     value={answers[question.id] ?? ""}
                     onChange={(event) =>
                       updateAnswer(question.id, event.target.value)

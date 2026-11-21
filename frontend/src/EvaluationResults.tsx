@@ -111,7 +111,7 @@ export default function EvaluationResults({
         {backLabel}
       </button>
 
-      <h2>Resultados da avaliação</h2>
+      <h2 id="evaluation-results-heading">Resultados da avaliação</h2>
 
       {results && (
         <div className="ui-card__actions">

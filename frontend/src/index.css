@@ -45,6 +45,23 @@ input {
   text-align: center;
 }
 
+/* O questionário mantém a aparência anterior do título, agora com nível principal. */
+.login-card .questionnaire-heading {
+  margin: 0.83em 0;
+  font-size: 24px;
+  text-align: left;
+}
+
+[tabindex="-1"]:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 4px;
+}
+
+/* Somente títulos focados pelo hook após interação por ponteiro. */
+:is(h1, h2, h3, h4, h5, h6)[data-view-focus-pointer]:focus {
+  outline: none;
+}
+
 .login-card>p {
   color: #64748b;
   text-align: center;
@@ -513,7 +530,16 @@ form.evaluation-card button[type="submit"]:not(:disabled):active {
 
 .ui-form {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: 12px;
+}
+
+.ui-form input,
+.ui-form select,
+.ui-form textarea {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .ui-form__actions {
@@ -615,6 +641,11 @@ button.ui-btn:focus-visible {
   outline-offset: 2px;
 }
 
+/* A seleção muda texto e fundo juntos, sem cores intermediárias de baixo contraste. */
+button.ui-btn[aria-pressed] {
+  transition: none;
+}
+
 button.ui-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
@@ -639,6 +670,18 @@ button.ui-btn:disabled {
 /* Responsividade */
 
 @media (max-width: 560px) {
+
+  .login-page {
+    padding: 16px;
+  }
+
+  .login-card {
+    padding: 20px;
+  }
+
+  form.evaluation-card {
+    padding: 16px;
+  }
 
   .ui-card__actions,
   .ui-form__actions {

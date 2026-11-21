@@ -2,6 +2,7 @@ import { API_BASE_URL } from "./api-config";
 import { useEffect, useState } from "react";
 import EvaluationResults from "./EvaluationResults";
 import { getEvaluationPeriodStatus } from "./evaluation-period-status";
+import { useViewFocus } from "./use-view-focus";
 
 type ProfessorEvaluation = {
   id: string;
@@ -38,6 +39,13 @@ export default function ProfessorEvaluations({
   const [selectedEvaluationId, setSelectedEvaluationId] = useState<
     string | null
   >(null);
+  const rememberFocus = useViewFocus(
+    selectedEvaluationId ?? "list",
+    selectedEvaluationId
+      ? "#evaluation-results-heading"
+      : "#professor-evaluations-heading",
+    !loading,
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -125,9 +133,9 @@ export default function ProfessorEvaluations({
 
         return (
           <li key={evaluation.id} className="evaluation-card ui-card">
-            <h4 className="ui-card__title">
+            <h3 className="ui-card__title">
               {evaluation.classGroup.discipline.name}
-            </h4>
+            </h3>
 
             <p className="ui-card__meta">Turma: {evaluation.classGroup.code}</p>
 
@@ -147,7 +155,11 @@ export default function ProfessorEvaluations({
               <button
                 type="button"
                 className="ui-btn ui-btn--secondary"
-                onClick={() => setSelectedEvaluationId(evaluation.id)}
+                data-focus-id={`professor-results-${evaluation.id}`}
+                onClick={() => {
+                  rememberFocus(`professor-results-${evaluation.id}`);
+                  setSelectedEvaluationId(evaluation.id);
+                }}
               >
                 Ver resultados
               </button>

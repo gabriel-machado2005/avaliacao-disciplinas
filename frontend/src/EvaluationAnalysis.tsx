@@ -5,6 +5,7 @@ import EvaluationQuestionMetrics, {
   type QuestionResult,
 } from "./EvaluationQuestionMetrics";
 import EvaluationResults from "./EvaluationResults";
+import { useViewFocus } from "./use-view-focus";
 
 type Option = { id: string; name: string };
 type PeriodOption = Option & { endDate: string };
@@ -273,6 +274,7 @@ function AnalysisResults({
                         <button
                           type="button"
                           className="ui-btn ui-btn--secondary"
+                          data-focus-id={`analysis-results-${period.id}-${evaluation.id}`}
                           onClick={() => onOpenEvaluation(evaluation.id)}
                         >
                           Ver resultados
@@ -302,6 +304,10 @@ export default function EvaluationAnalysis() {
     message: string;
   } | null>(null);
   const [evaluationId, setEvaluationId] = useState<string | null>(null);
+  const rememberFocus = useViewFocus(
+    evaluationId ?? "analysis",
+    evaluationId ? "#evaluation-results-heading" : "#analysis-heading",
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -524,7 +530,15 @@ export default function EvaluationAnalysis() {
         </div>
       )}
       {results && (
-        <AnalysisResults data={results} onOpenEvaluation={setEvaluationId} />
+        <AnalysisResults
+          data={results}
+          onOpenEvaluation={(id) => {
+            const focusId = (document.activeElement as HTMLElement | null)
+              ?.dataset.focusId;
+            if (focusId) rememberFocus(focusId);
+            setEvaluationId(id);
+          }}
+        />
       )}
     </section>
   );

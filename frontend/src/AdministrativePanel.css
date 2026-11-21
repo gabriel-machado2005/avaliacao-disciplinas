@@ -66,6 +66,10 @@
     box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.12);
 }
 
+.admin-menu__card[aria-pressed="true"] .admin-menu__description {
+    color: #475569;
+}
+
 .login-card .admin-menu__card:focus-visible {
     outline: 3px solid #2563eb;
     outline-offset: 3px;

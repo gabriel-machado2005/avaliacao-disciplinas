@@ -7,6 +7,7 @@ import EvaluationQuestionnaire, {
 import ProfessorEvaluations from "./ProfessorEvaluations";
 import ImprovementPlans from "./ImprovementPlans";
 import AdministrativePanel from "./AdministrativePanel";
+import { useViewFocus } from "./use-view-focus";
 
 type User = {
   name: string;
@@ -70,6 +71,22 @@ function App() {
   const [questionnaireLoading, setQuestionnaireLoading] = useState(false);
   const [questionnaireError, setQuestionnaireError] = useState("");
   const [refreshCount, setRefreshCount] = useState(0);
+  const rememberFocus = useViewFocus(
+    questionnaireData
+      ? `questionnaire-${questionnaireData.evaluationId}`
+      : loggedInUser
+        ? `dashboard-${loggedInUser.role}`
+        : "login",
+    "main h1",
+    Boolean(questionnaireData) || !evaluationsLoading,
+  );
+  useViewFocus(
+    professorSection,
+    professorSection === "plans"
+      ? "#improvement-plans-heading"
+      : "#professor-evaluations-heading",
+    loggedInUser?.role === "PROFESSOR",
+  );
 
   useEffect(() => {
     if (!loggedInUser || loggedInUser.role !== "STUDENT") {
@@ -182,6 +199,7 @@ function App() {
     }
   }
   async function handleOpenQuestionnaire(evaluationId: string) {
+    rememberFocus(`respond-${evaluationId}`);
     setQuestionnaireLoading(true);
     setQuestionnaireError("");
 
@@ -222,6 +240,7 @@ function App() {
     setLoggedInUser(null);
     setProfessorSection("evaluations");
     setEvaluations([]);
+    setEvaluationsLoading(false);
     setEvaluationsError("");
     setEmail("");
     setPassword("");
@@ -234,6 +253,7 @@ function App() {
           <EvaluationQuestionnaire
             data={questionnaireData}
             onBack={() => {
+              setEvaluationsLoading(true);
               setQuestionnaireData(null);
               setRefreshCount((previous) => previous + 1);
             }}
@@ -274,7 +294,9 @@ function App() {
             <ImprovementPlans role="PROFESSOR" />
           ) : (
             <>
-              <h2>Avaliações das minhas turmas</h2>
+              <h2 id="professor-evaluations-heading">
+                Avaliações das minhas turmas
+              </h2>
               <ProfessorEvaluations />
             </>
           )}
@@ -371,9 +393,9 @@ function App() {
 
                 return (
                   <li key={item.id} className="evaluation-card ui-card">
-                    <h4 className="ui-card__title">
+                    <h3 className="ui-card__title">
                       {classGroup.discipline.name}
-                    </h4>
+                    </h3>
 
                     <p className="ui-card__meta">Turma: {classGroup.code}</p>
 
@@ -402,6 +424,7 @@ function App() {
                         <button
                           type="button"
                           className="ui-btn ui-btn--primary"
+                          data-focus-id={`respond-${item.evaluation.id}`}
                           disabled={questionnaireLoading}
                           onClick={() =>
                             handleOpenQuestionnaire(item.evaluation.id)

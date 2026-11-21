@@ -41,3 +41,8 @@ QuestionnaireManagement.txt
 tests/load/.local/
 tests/load/results/
 tests/load/fixtures-private*.json
+
+# Resultados de navegador (o executor utiliza um diretório externo)
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/

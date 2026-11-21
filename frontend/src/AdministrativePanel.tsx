@@ -10,6 +10,7 @@ import ImprovementPlans from "./ImprovementPlans";
 import QuestionnaireManagement from "./QuestionnaireManagement";
 import EvaluationEligibilities from "./EvaluationEligibilities";
 import "./AdministrativePanel.css";
+import { useViewFocus } from "./use-view-focus";
 
 type Props = {
   role: "ADMIN" | "COORDINATOR";
@@ -128,9 +129,7 @@ function MenuIcon({ section }: { section: Section }) {
         </>
       )}
 
-      {section === "analysis" && (
-        <path d="M4 4v16h16M9 16v-4m5 4V8m5 8V5" />
-      )}
+      {section === "analysis" && <path d="M4 4v16h16M9 16v-4m5 4V8m5 8V5" />}
 
       {section === "improvement-plans" && (
         <>
@@ -225,6 +224,7 @@ export default function AdministrativePanel({ role }: Props) {
 
     return saved !== "false";
   });
+  useViewFocus(activeSection, ".admin-panel-content h2");
 
   useEffect(() => {
     sessionStorage.setItem(
@@ -302,27 +302,29 @@ export default function AdministrativePanel({ role }: Props) {
         ))}
       </nav>
 
-      {activeSection === "evaluations" ? (
-        <EvaluationManagement role={role} />
-      ) : activeSection === "analysis" ? (
-        <EvaluationAnalysis />
-      ) : activeSection === "improvement-plans" ? (
-        <ImprovementPlans role={role} />
-      ) : activeSection === "courses" ? (
-        <AcademicCourses role={role} />
-      ) : activeSection === "disciplines" ? (
-        <AcademicDisciplines role={role} />
-      ) : activeSection === "terms" ? (
-        <AcademicTerms role={role} />
-      ) : activeSection === "classes" ? (
-        <AcademicClasses role={role} />
-      ) : activeSection === "periods" ? (
-        <EvaluationPeriods role={role} />
-      ) : activeSection === "eligibilities" ? (
-        <EvaluationEligibilities />
-      ) : (
-        <QuestionnaireManagement />
-      )}
+      <div className="admin-panel-content">
+        {activeSection === "evaluations" ? (
+          <EvaluationManagement role={role} />
+        ) : activeSection === "analysis" ? (
+          <EvaluationAnalysis />
+        ) : activeSection === "improvement-plans" ? (
+          <ImprovementPlans role={role} />
+        ) : activeSection === "courses" ? (
+          <AcademicCourses role={role} />
+        ) : activeSection === "disciplines" ? (
+          <AcademicDisciplines role={role} />
+        ) : activeSection === "terms" ? (
+          <AcademicTerms role={role} />
+        ) : activeSection === "classes" ? (
+          <AcademicClasses role={role} />
+        ) : activeSection === "periods" ? (
+          <EvaluationPeriods role={role} />
+        ) : activeSection === "eligibilities" ? (
+          <EvaluationEligibilities />
+        ) : (
+          <QuestionnaireManagement />
+        )}
+      </div>
     </div>
   );
 }

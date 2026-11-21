@@ -1,6 +1,7 @@
 import { API_BASE_URL } from "./api-config";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import EvaluationResults from "./EvaluationResults";
+import { useViewFocus } from "./use-view-focus";
 
 type EvaluationPeriod = {
   id: string;
@@ -65,6 +66,13 @@ export default function EvaluationManagement({
     string | null
   >(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const rememberFocus = useViewFocus(
+    selectedEvaluationId ?? "list",
+    selectedEvaluationId
+      ? "#evaluation-results-heading"
+      : "#evaluation-management-heading",
+    !listLoading,
+  );
 
   const [evaluationPeriodId, setEvaluationPeriodId] = useState("");
   const [classGroupId, setClassGroupId] = useState("");
@@ -403,7 +411,7 @@ export default function EvaluationManagement({
   }
   return (
     <section>
-      <h2>Gerenciamento de avaliações</h2>
+      <h2 id="evaluation-management-heading">Gerenciamento de avaliações</h2>
 
       <form
         ref={formRef}
@@ -615,7 +623,11 @@ export default function EvaluationManagement({
                 <button
                   type="button"
                   className="ui-btn ui-btn--secondary"
-                  onClick={() => setSelectedEvaluationId(evaluation.id)}
+                  data-focus-id={`admin-results-${evaluation.id}`}
+                  onClick={() => {
+                    rememberFocus(`admin-results-${evaluation.id}`);
+                    setSelectedEvaluationId(evaluation.id);
+                  }}
                   disabled={saving || listLoading}
                 >
                   Ver resultados
